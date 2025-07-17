@@ -1,50 +1,29 @@
 // --- GLOBAL APP STATE ---
-let map, markers = L.featureGroup(), heatLayer;
-let provinceDataSummary = {}; // To be filled by precalculateProvincialSummary
-let monthlyTrendChart, ageGroupPieChart, fakeCnicPieChart;
+let map, markerClusterGroup, geoJsonLayer;
+let provinceDataSummary = {};
+let monthlyTrendChart;
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     if (!trainingData || trainingData.length === 0) {
         console.error("Mock data is missing or empty!");
-        alert("Could not load mock data. Dashboard cannot be displayed.");
+        alert("Could not load mock data.");
         return;
     }
     
-    console.log("Data loaded:", trainingData.length, "rows");
-
-    // Start clock
     updateTime();
     setInterval(updateTime, 1000);
 
-    // Setup UI components
     populateFilters(trainingData);
     populateProvinceButtons(trainingData);
     initializeMap();
     initializeCharts();
     
-    // Process data
     precalculateProvincialSummary(trainingData);
-
-    // Initial dashboard render
     updateDashboard();
 
     // Add event listeners
-    document.querySelector('.chart-filter-buttons').addEventListener('click', (event) => {
-        if (event.target.classList.contains('chart-filter-button')) {
-            document.querySelector('.chart-filter-buttons').querySelectorAll('.chart-filter-button').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-            updateDashboard(); // Redraw chart with new unit
-        }
-    });
-    
-    document.getElementById('toggleHeatmap').addEventListener('click', toggleHeatmap);
-
-    // Select the first province by default
-    const firstProvinceButton = document.querySelector('#provinceButtons .province-button');
-    if (firstProvinceButton) {
-        firstProvinceButton.click();
-    }
+    document.getElementById('provinceFilter').addEventListener('change', updateDashboard);
 });
 
 // --- CORE FUNCTIONS ---
@@ -62,7 +41,6 @@ function precalculateProvincialSummary(data) {
         }
         provinceDataSummary[provinceName].trainings++;
         provinceDataSummary[provinceName].beneficiaries += item.Beneficiary_Count_Actual || 0;
-        provinceDataSummary[provinceName].accounts += (item.Accounts_Opened_MW || 0) + (item.Accounts_Opened_Bank || 0);
         if (item.Avg_Training_Time_Hours) {
             provinceDataSummary[provinceName].total_training_time += parseFloat(item.Avg_Training_Time_Hours);
             provinceDataSummary[provinceName].training_count_for_avg_time++;
@@ -78,93 +56,107 @@ function precalculateProvincialSummary(data) {
 
 function initializeMap() {
     map = L.map('map', { zoomControl: false, attributionControl: false }).setView([30.3753, 69.3451], 5.5);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { 
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { 
         attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>',
-        className: 'map-tiles-light' 
     }).addTo(map);
-    markers.addTo(map);
-    heatLayer = L.heatLayer([], { radius: 25, blur: 15, maxZoom: 10, gradient: {0.4: '#60a5fa', 0.65: '#2dd4bf', 1: '#ef4444'} });
 
-    L.Control.Custom = L.Control.extend({
-        onAdd: function(map) {
-            const div = L.DomUtil.create('div');
-            div.innerHTML = this.options.content;
-            L.DomUtil.addClass(div, this.options.classes);
-            L.DomEvent.disableClickPropagation(div);
-            return div;
+    markerClusterGroup = L.markerClusterGroup().addTo(map);
+
+    // Initialize GeoJSON layer for provinces
+    geoJsonLayer = L.geoJson(provincesData, {
+        style: function(feature) {
+            return {
+                color: provinceColors[feature.properties.PROVINCE] || '#ffffff',
+                weight: 1.5,
+                opacity: 0.6,
+                fillColor: provinceColors[feature.properties.PROVINCE] || '#ffffff',
+                fillOpacity: 0.1
+            };
         },
-        onRemove: function(map) {}
-    });
-    L.control.custom = (opts) => new L.Control.Custom(opts);
-
-    const alertsOverlayDiv = document.getElementById('alertsOverlay');
-    if (alertsOverlayDiv) {
-        L.control.custom({
-            position: 'bottomleft',
-            content: alertsOverlayDiv.outerHTML,
-            classes: 'leaflet-control-alerts-overlay'
-        }).addTo(map);
-        alertsOverlayDiv.remove();
-    }
+        onEachFeature: function(feature, layer) {
+            layer.on({
+                mouseover: e => {
+                    const l = e.target;
+                    l.setStyle({ weight: 3, opacity: 1, fillOpacity: 0.3 });
+                },
+                mouseout: e => geoJsonLayer.resetStyle(e.target),
+                click: e => filterByProvince(e.target.feature.properties.PROVINCE)
+            });
+        }
+    }).addTo(map);
 }
 
 function initializeCharts() {
-    const ticksColor = CHART_COLORS.text, gridColor = '#e5e7eb';
-    const defaultOptions = { 
-        responsive: true, maintainAspectRatio: false,
-        plugins: { 
-            legend: { display: false, labels: { color: ticksColor, font: { family: 'Montserrat' } } },
-            tooltip: {
-                titleColor: CHART_COLORS.text, bodyColor: CHART_COLORS.text, backgroundColor: '#fff',
-                borderColor: '#d1d5db', borderWidth: 1, boxPadding: 4,
-                bodyFont: { family: 'Montserrat' }, titleFont: { family: 'Montserrat' },
-            }
-        },
-        scales: {
-            x: { ticks: { color: ticksColor, font: { family: 'Montserrat' } }, grid: { color: gridColor } },
-            y: { ticks: { color: ticksColor, font: { family: 'Montserrat' } }, grid: { color: gridColor } }
-        }
-    };
+    const ticksColor = '#9ca3af', gridColor = 'rgba(55, 65, 81, 0.5)';
     
     monthlyTrendChart = new Chart(document.getElementById('monthlyTrendChart').getContext('2d'), {
         type: 'line',
-        data: { labels: [], datasets: [{ data: [], borderWidth: 2, tension: 0.3, pointRadius: 3, pointBackgroundColor: CHART_COLORS.primary, borderColor: CHART_COLORS.primary }] },
+        data: { labels: [], datasets: [{ 
+            data: [], 
+            borderColor: CHART_COLORS.primary,
+            backgroundColor: 'rgba(79, 70, 229, 0.2)',
+            borderWidth: 2, 
+            tension: 0.4, 
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            pointBackgroundColor: CHART_COLORS.primary,
+            fill: true
+        }] },
         options: {
-            ...defaultOptions,
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
             scales: {
-                x: { type: 'time', time: { unit: 'month' }, ticks: { color: ticksColor, font: { family: 'Montserrat' } }, grid: { color: gridColor } },
-                y: { beginAtZero: true, ticks: { color: ticksColor, font: { family: 'Montserrat' } }, grid: { color: gridColor } }
-            },
-            plugins: { ...defaultOptions.plugins, annotation: { annotations: { targetLine: { type: 'line', yScaleID: 'y', value: 0, borderColor: CHART_COLORS.danger, borderWidth: 2, borderDash: [6, 6], label: { content: 'Target', enabled: true, position: 'end', color: CHART_COLORS.danger, font: { family: 'Montserrat', size: 10 } } } } } }
+                x: { type: 'time', time: { unit: 'month' }, ticks: { color: ticksColor }, grid: { color: gridColor } },
+                y: { beginAtZero: true, ticks: { color: ticksColor }, grid: { color: gridColor } }
+            }
         }
     });
 }
 
-function toggleHeatmap() {
-    if (map.hasLayer(heatLayer)) {
-        map.removeLayer(heatLayer);
-        map.addLayer(markers);
-    } else {
-        map.removeLayer(markers);
-        map.addLayer(heatLayer);
-    }
+function filterByProvince(provinceName) {
+    // Update the dropdown
+    document.getElementById('provinceFilter').value = provinceName;
+    
+    // Update the active button
+    document.querySelectorAll('.province-button').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.province === provinceName);
+    });
+
+    // Update the map style
+    geoJsonLayer.eachLayer(layer => {
+        if (layer.feature.properties.PROVINCE === provinceName) {
+            layer.setStyle({ weight: 4, opacity: 1, fillOpacity: 0.4 });
+        } else {
+            geoJsonLayer.resetStyle(layer);
+        }
+    });
+
+    // Re-render the dashboard with the new filter
+    updateDashboard();
 }
+
 
 // --- MAIN UPDATE ORCHESTRATOR ---
 function updateDashboard() {
     const provinceFilterValue = document.getElementById('provinceFilter').value;
     const filteredData = trainingData.filter(item => provinceFilterValue === 'All' || item.Province === provinceFilterValue);
     
-    // These functions use the globally available `trainingData` for rankings that should not be filtered.
-    updateLeaderboard(trainingData);
-    updateProvincialRanking(trainingData);
-    updateAlerts(trainingData);
-    
-    // These functions use the `filteredData` based on the user's selection.
+    // Update components
     updateKPIs(filteredData, provinceFilterValue);
-    updateMapAndHeatmap(filteredData);
-    
-    const activeUnitButton = document.querySelector('.chart-filter-buttons .active');
-    const currentUnit = activeUnitButton ? activeUnitButton.dataset.unit : 'month';
-    updateMonthlyTrendChart(filteredData, currentUnit);
+    updateMap(filteredData);
+    updateMonthlyTrendChart(filteredData);
+    updateProvincialRanking(trainingData); // Always show all provinces for ranking
+    updateLeaderboard(trainingData); // Based on all data
+
+    // If a specific province is selected, show its summary. Otherwise, show a default message.
+    if (provinceFilterValue !== 'All') {
+        updateProvincialSummaryContent(provinceFilterValue);
+        document.querySelectorAll('.province-button').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.province === provinceFilterValue);
+        });
+    } else {
+        document.getElementById('provincialSummaryContent').innerHTML = `<p class="text-gray-500 text-sm col-span-3 text-center">Select a province to see details.</p>`;
+        document.querySelectorAll('.province-button').forEach(btn => btn.classList.remove('active'));
+        geoJsonLayer.eachLayer(layer => geoJsonLayer.resetStyle(layer));
+    }
 }
