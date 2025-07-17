@@ -3,108 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DFLT Mission Control</title>
+    <title>DFLT by Dr.Fareeha</title>
     
+    <!-- External Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    
+    <!-- Marker Cluster Libraries -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     
+    <!-- Your Custom Stylesheet -->
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div class="dashboard-grid">
-        <header class="card header flex items-center justify-between !py-2">
+        <header class="card header flex items-center justify-between">
             <div class="flex items-center gap-4">
-                <img src="https://www.sdpi.org/assets/images/sdpi-logo-2020.webp" alt="SDPI Logo" class="h-10">
-                <h1 class="text-xl font-extrabold text-gray-900">DFLT Mission Control</h1>
+                <img src="https://i.imgur.com/sC5a46y.png" alt="SDPI Logo" class="h-10"> <!-- Using a white version for dark theme -->
+                <h1 class="text-xl font-extrabold">DFLT Mission Control</h1>
             </div>
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2">
-                    <label for="provinceFilter" class="text-xs font-medium text-gray-600">Province Filter:</label>
-                   <select id="provinceFilter" class="block w-40 py-1 px-2 border border-gray-300 bg-gray-50 text-gray-900 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-xs" onchange="updateDashboard()"></select>
+                    <label for="provinceFilter" class="text-xs font-medium">Filter:</label>
+                   <select id="provinceFilter" class="block w-40 py-1 px-2 border border-gray-600 bg-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-xs"></select>
                 </div>
                 <div class="text-right">
-                    <p id="currentTime" class="font-bold text-gray-900 text-lg"></p>
-                    <p id="currentDate" class="text-xs text-gray-600"></p>
+                    <p id="currentTime" class="font-bold text-lg"></p>
+                    <p id="currentDate" class="text-xs opacity-70"></p>
                 </div>
-                <img src="https://logodix.com/logo/2182524.png" alt="DFLT Logo" class="h-10">
+                <img src="https://i.imgur.com/3Y24e4p.png" alt="DFLT Logo" class="h-10"> <!-- Using a white version for dark theme -->
             </div>
         </header>
 
-        <div class="card map-card !p-1 relative">
+        <div class="card map-card !p-0 relative overflow-hidden">
             <div id="map"></div>
-            <div class="absolute top-2 right-2 z-[1000] bg-white/70 p-1 rounded-lg border border-gray-200">
-                <button id="toggleHeatmap" class="px-3 py-1 text-xs text-white bg-indigo-600 rounded-md">Toggle Heatmap</button>
-            </div>
-            <div id="alertsOverlay" class="alerts-overlay hidden">
-                <h3 class="text-md font-bold text-red-600 flex-shrink-0">Operational Alerts</h3>
-                <ul id="alertsList" class="text-sm space-y-2"></ul>
-            </div>
         </div>
         
         <div class="kpi-main">
             <div class="card justify-center">
-                <h3 class="text-sm font-medium text-gray-600 flex items-center justify-between">
-                    <span>Total Beneficiaries Trained</span>
-                    <span id="beneficiariesTargetPct" class="text-xs font-semibold text-teal-500">0%</span>
+                <h3 class="text-sm font-medium opacity-70 flex items-center justify-between">
+                    <span>Total Beneficiaries</span>
                 </h3>
-                <p id="totalBeneficiaries" class="text-4xl font-black text-indigo-600">0</p>
+                <p id="totalBeneficiaries" class="text-4xl font-black text-indigo-400 my-1">0</p>
+                <div class="w-full bg-gray-700 rounded-full h-1.5 mt-1">
+                  <div id="beneficiariesProgressBar" class="bg-indigo-400 h-1.5 rounded-full" style="width: 0%"></div>
+                </div>
+                <p id="beneficiariesTargetPct" class="text-xs font-semibold text-indigo-400 text-right mt-1">0% of target</p>
             </div>
             <div class="card justify-center">
-                <h3 class="text-sm font-medium text-gray-600 flex items-center justify-between">
-                    <span>Total Trainings Conducted</span>
-                    <span id="trainingsTargetPct" class="text-xs font-semibold text-emerald-500">0%</span>
+                <h3 class="text-sm font-medium opacity-70 flex items-center justify-between">
+                    <span>Total Trainings</span>
                 </h3>
-                <p id="totalTrainings" class="text-4xl font-black text-indigo-600">0</p>
+                <p id="totalTrainings" class="text-4xl font-black text-teal-400 my-1">0</p>
+                 <div class="w-full bg-gray-700 rounded-full h-1.5 mt-1">
+                  <div id="trainingsProgressBar" class="bg-teal-400 h-1.5 rounded-full" style="width: 0%"></div>
+                </div>
+                <p id="trainingsTargetPct" class="text-xs font-semibold text-teal-400 text-right mt-1">0% of target</p>
             </div>
             <div class="card justify-center col-span-1">
-                <h3 class="text-sm font-medium text-gray-600">Top Performing Province</h3>
-                <p id="topProvinceName" class="text-2xl font-black text-blue-600 mt-1">N/A</p>
-                <p id="topProvincePct" class="text-xl font-bold text-blue-500 mt-0">0% Target Achieved</p>
+                <h3 class="text-sm font-medium opacity-70">Top Performing Province</h3>
+                <p id="topProvinceName" class="text-2xl font-black text-sky-400 my-1">N/A</p>
+                <div class="w-full bg-gray-700 rounded-full h-1.5 mt-1">
+                  <div id="topProvinceProgressBar" class="bg-sky-400 h-1.5 rounded-full" style="width: 0%"></div>
+                </div>
+                <p id="topProvincePct" class="text-xs font-bold text-sky-400 text-right mt-1">0% Target Achieved</p>
             </div>
         </div>
 
         <div class="card provincial-summary-card">
-            <h3 class="text-md font-bold text-gray-800 flex-shrink-0 mb-4">Provincial Performance Overview</h3>
-            <div id="provinceButtons" class="flex flex-wrap gap-2 mb-4"></div>
-            <div id="provincialSummaryContent" class="flex-grow flex flex-col items-center justify-center p-4">
-                <p class="text-gray-500 text-sm">Select a province above to view its performance details.</p>
+            <div class="flex items-center justify-between mb-2">
+                 <h3 class="text-md font-bold">Provincial Performance Overview</h3>
+                 <div id="provinceButtons" class="flex flex-wrap gap-2"></div>
+            </div>
+            <div id="provincialSummaryContent" class="flex-grow grid grid-cols-3 gap-4 items-center justify-center p-2">
+                <!-- Content generated by ui.js -->
             </div>
         </div>
 
         <div class="card monthly-trend-card">
-            <h3 class="text-md font-bold text-gray-800 flex-shrink-0">Beneficiaries Trend (8 Months)</h3>
-            <div class="chart-filter-buttons">
-                <button class="chart-filter-button active" data-unit="month">Monthly</button>
-                <button class="chart-filter-button" data-unit="day">Daily</button>
-            </div>
-            <div class="chart-container"><canvas id="monthlyTrendChart"></canvas></div>
+            <h3 class="text-md font-bold flex-shrink-0">Beneficiaries Trend (8 Months)</h3>
+            <div class="chart-container mt-4"><canvas id="monthlyTrendChart"></canvas></div>
         </div>
 
         <div class="card provincial-ranking-card">
-            <h3 class="text-md font-bold text-gray-800 flex-shrink-0">Provincial Ranking (by Beneficiaries)</h3>
+            <h3 class="text-md font-bold flex-shrink-0">Provincial Ranking</h3>
             <div class="table-container mt-2">
-                <table class="w-full text-left text-sm"><thead class="text-xs text-gray-600 uppercase bg-gray-100"><tr><th class="px-4 py-2">Rank</th><th class="px-4 py-2">Province</th><th class="px-4 py-2">Beneficiaries</th></tr></thead><tbody id="provincialRankingTableBody"></tbody></table>
+                <table class="w-full text-left text-sm">
+                    <thead class="text-xs uppercase">
+                        <tr>
+                            <th class="px-4 py-2">Rank</th>
+                            <th class="px-4 py-2">Province</th>
+                            <th class="px-4 py-2">Beneficiaries</th>
+                            <th class="px-4 py-2 w-1/3">Target % Achieved</th>
+                        </tr>
+                    </thead>
+                    <tbody id="provincialRankingTableBody"></tbody>
+                </table>
             </div>
         </div>
 
         <div class="card leaderboard-card">
-            <h3 class="text-md font-bold text-gray-800 flex-shrink-0">Top Trainers (Monthly Ranking)</h3>
+            <h3 class="text-md font-bold flex-shrink-0">Top Trainers (Monthly Ranking)</h3>
             <div class="table-container mt-2">
-                <table class="w-full text-left text-sm"><thead class="text-xs text-gray-600 uppercase bg-gray-100"><tr><th class="px-4 py-2">Trainer</th><th class="px-4 py-2">Beneficiaries</th><th class="px-4 py-2">Target %</th></tr></thead><tbody id="leaderboardTableBody"></tbody></table>
+                <table class="w-full text-left text-sm">
+                     <thead class="text-xs uppercase">
+                        <tr>
+                            <th class="px-4 py-2">Trainer</th>
+                            <th class="px-4 py-2">Beneficiaries</th>
+                            <th class="px-4 py-2">Target %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardTableBody"></tbody>
+                </table>
             </div>
         </div>
     </div>
 
+    <!-- Your Custom Scripts -->
     <script src="js/config.js"></script>
     <script src="js/data.js"></script>
+    <script src="js/pakistan_provinces.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/main.js"></script>
 </body>
