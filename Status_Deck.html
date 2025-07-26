@@ -1,0 +1,1886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DFLT Phase 2 Dashboard</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* Custom CSS Variables for easy theme management */
+        :root {
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --border-color: #dee2e6;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --bar-bg: #e9ecef;
+            
+            /* Custom colors for bar segments */
+            --c-valid: #28a745;
+            --c-fake: #ffc107;
+            --c-age1: #0d6efd;
+            --c-age2: #6f42c1;
+            --c-age3: #17a2b8;
+            --c-age4: #6c757d;
+            --c-training: #0d6efd;
+            --c-handbooks: #20c997;
+        }
+
+        /* Base styles for body and font */
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--bg-color);
+            background-image: linear-gradient(175deg, #f8f9fa 0%, #e9ecef 100%);
+            color: var(--text-primary);
+            overflow: hidden; /* Prevent scrollbars from showing due to initial animations */
+        }
+
+        /* Main dashboard grid layout using CSS Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-template-rows: 60px repeat(10, minmax(0, 1fr)); /* Header + 10 rows for content */
+            gap: 1rem;
+            height: 100vh; /* Full viewport height */
+            padding: 1rem;
+            box-sizing: border-box; /* Include padding in element's total width and height */
+        }
+
+        /* Styling for all dashboard cards with animations and shadows */
+        .card {
+            background-color: rgba(255, 255, 255, 0.9); /* Slightly transparent background */
+            backdrop-filter: blur(10px); /* Frosted glass effect */
+            border-radius: 0.75rem;
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.5s ease-out forwards; /* Fade-in animation */
+            color: var(--text-primary);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* Soft shadow */
+            min-height: 0; /* Allow cards to shrink as needed */
+        }
+
+        /* Ensure Montserrat font and correct text color for all relevant elements */
+        h1, h2, h3, h4, p, span, div, label, select, button, table, th, td {
+            font-family: 'Montserrat', sans-serif !important;
+            color: var(--text-primary);
+        }
+        /* Specific color overrides for Tailwind classes to ensure light mode compatibility */
+        .text-white { color: var(--text-primary) !important; }
+        .text-gray-400 { color: var(--text-secondary) !important; }
+        .text-gray-200 { color: #374151 !important; }
+        .text-gray-300 { color: #4b5563 !important; }
+        .text-gray-500 { color: var(--text-secondary) !important; }
+        .text-red-400 { color: #ef4444 !important; }
+        .text-yellow-400 { color: #facc15 !important; }
+        .text-indigo-400 { color: #6366f1 !important; }
+        .text-teal-400 { color: #2dd4bf !important; }
+        .text-indigo-300 { color: #818cf8 !important; }
+
+
+        /* Keyframe animation for general fade-in effect */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Grid placement for main sections */
+        .header {
+            grid-column: 1 / -1; /* Spans all columns */
+            grid-row: 1; /* First row */
+            background-color: var(--card-bg);
+        }
+        .map-card {
+            grid-column: 1 / 8; /* Spans 7 columns */
+            grid-row: 2 / 8; /* Spans rows 2 to 7 */
+            position: relative;
+        }
+        .kpi-main {
+            grid-column: 8 / 13; /* Spans 5 columns */
+            grid-row: 2 / 4; /* Spans rows 2 to 3 */
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* 3 columns for KPIs */
+            gap: 1rem;
+            background-color: transparent; /* Remove background for this container */
+            border: none;
+            box-shadow: none;
+            padding: 0;
+        }
+        .kpi-main .card {
+            background-color: rgba(255, 255, 255, 0.9); /* Individual KPI cards retain background */
+            justify-content: center;
+        }
+
+        .provincial-summary-card {
+            grid-column: 8 / 13; /* Spans 5 columns */
+            grid-row: 4 / 8; /* Spans rows 4 to 7 */
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            overflow-y: hidden; /* Hide scrollbar for the entire card, its content will scroll */
+        }
+        /* Specific content area within provincial summary card for scrolling */
+        #provincialSummaryContent {
+            flex-grow: 1;
+            overflow-y: auto; /* Enable scrolling for content */
+        }
+
+
+        .monthly-trend-card {
+            grid-column: 1 / 5; /* Spans 4 columns */
+            grid-row: 8 / 12; /* Spans rows 8 to 11 */
+        }
+        .provincial-ranking-card {
+            grid-column: 5 / 9; /* Spans 4 columns */
+            grid-row: 8 / 12;
+        }
+        .leaderboard-card {
+            grid-column: 9 / 13; /* Spans 4 columns */
+            grid-row: 8 / 12;
+        }
+
+        /* Leaflet map styling */
+        #map {
+            height: 100%;
+            width: 100%;
+            border-radius: 0.5rem;
+            z-index: 0; /* Ensure map is behind other elements */
+        }
+        /* Light mode popups for Leaflet */
+        .leaflet-popup-content-wrapper {
+            background-color: #fff;
+            color: #1f2937;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            font-family: 'Montserrat', sans-serif !important;
+        }
+        .leaflet-popup-tip { background-color: #fff; }
+        .leaflet-popup-content-wrapper * { font-family: 'Montserrat', sans-serif !important; color: #1f2937; }
+
+        /* Chart.js specific styling (for monthly trend) */
+        .chart-container {
+            flex-grow: 1; /* Allow chart to take available space */
+            position: relative;
+            min-height: 0; /* Prevent flex item from overflowing */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Table container for scrolling content within cards */
+        .table-container {
+            flex-grow: 1;
+            overflow-y: auto; /* Enable scrolling for table content */
+            min-height: 0;
+        }
+        /* Custom scrollbar styling for better aesthetics */
+        .table-container::-webkit-scrollbar { width: 6px; }
+        .table-container::-webkit-scrollbar-track { background: transparent; }
+        .table-container::-webkit-scrollbar-thumb { background-color: #d1d5db; border-radius: 10px; }
+        .table-container thead {
+            background-color: #e5e7eb;
+            position: sticky; /* Keep header visible on scroll */
+            top: 0;
+            z-index: 1;
+        }
+
+        /* Provincial Summary Card Specific Styles (for Chart.js based graphs) */
+        .province-metric-item {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            background-color: rgba(243, 244, 246, 0.5); /* Light background for metric items */
+            border: 1px solid #f3f4f6;
+            height: 100%;
+            min-height: 120px;
+        }
+        .province-metric-item .chart-container {
+            flex-grow: 1;
+            width: 100%;
+            min-height: 80px;
+        }
+        .province-metric-item canvas {
+            max-height: 100%;
+            max-width: 100%;
+        }
+
+
+        /* Province filter buttons styling (removed from HTML) */
+        .province-button {
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            background-color: #d1d5db;
+            color: #374151;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid #cbd5e1;
+            transition: all 0.2s ease-in-out;
+        }
+        .province-button:hover {
+            background-color: #e5e7eb;
+            transform: translateY(-2px);
+        }
+        .province-button.active {
+            background-color: #4f46e5;
+            border-color: #6366f1;
+            color: white;
+            box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3);
+        }
+
+        /* Custom marker icon styling for map */
+        .leaflet-div-icon {
+            background: none !important;
+            border: none !important;
+        }
+        .location-dot {
+            border-radius: 50%;
+            background-color: #4f46e5;
+            box-shadow: 0 0 8px rgba(79, 70, 229, 0.6);
+            transition: all 0.1s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid white;
+        }
+        .location-dot-pulse {
+            animation: dot-pulse 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+            position: absolute;
+            border-radius: 50%;
+            background-color: #4f46e5;
+            opacity: 0.2;
+        }
+        @keyframes dot-pulse {
+            0% { transform: scale(0.5); opacity: 0.8; }
+            100% { transform: scale(1.2); opacity: 0; }
+        }
+
+        /* Meter Chart (Gauge) Styles (no longer explicitly used in JS, but might be part of Chart.js elements) */
+        .gauge-container {
+            width: 100%;
+            max-width: 150px;
+            height: 100px;
+            margin: 0 auto;
+            position: relative;
+            overflow: hidden;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .gauge-container svg {
+            width: 100%;
+            height: auto;
+        }
+        .gauge-arc {
+            fill: none;
+            stroke: #e5e7eb;
+            stroke-width: 10;
+        }
+        .gauge-value-arc {
+            fill: none;
+            stroke: #4f46e5;
+            stroke-width: 10;
+            stroke-linecap: round;
+            transition: stroke-dasharray .5s ease-in-out;
+        }
+        .gauge-text {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .gauge-label {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+
+        /* Alerts overlay on map */
+        .leaflet-control-alerts-overlay { /* Renamed for Leaflet control */
+            position: absolute; /* This might be overridden by Leaflet's control positioning */
+            bottom: 1rem;
+            left: 1rem;
+            z-index: 1000;
+            max-height: 200px;
+            width: 250px;
+            background-color: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            border-radius: 0.75rem;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 0.75rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            color: #1f2937;
+        }
+        .leaflet-control-alerts-overlay ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .leaflet-control-alerts-overlay li {
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+        }
+        .leaflet-control-alerts-overlay::-webkit-scrollbar { width: 4px; }
+        .leaflet-control-alerts-overlay::-webkit-scrollbar-track { background: transparent; }
+        .leaflet-control-alerts-overlay::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+
+        /* Styles for the Monthly/Daily trend chart's filter buttons */
+        .chart-filter-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            margin-bottom: 1rem;
+            justify-content: center;
+        }
+        .chart-filter-button {
+            padding: 0.3rem 0.6rem;
+            border-radius: 0.3rem;
+            background-color: #e0e7ff;
+            color: #4f46e5;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid #c7d2fe;
+            transition: all 0.2s ease-in-out;
+        }
+        .chart-filter-button.active {
+            background-color: #4f46e5;
+            color: white;
+            box-shadow: 0 2px 5px rgba(79, 70, 229, 0.2);
+        }
+        .chart-filter-button:hover {
+            background-color: #a5b4fc;
+        }
+
+        /* SVG Map specific styling */
+        .leaflet-control-pakistan-svg-overlay { /* Renamed for Leaflet control */
+            z-index: 500; /* Ensure this is below markers but above map tiles */
+            position: absolute;
+            pointer-events: none; /* Allows clicks to pass through to the map below */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* Adjust positioning as needed for the specific control */
+            top: 0; /* Example adjustment */
+            left: 0; /* Example adjustment */
+            width: 100%;
+            height: 100%;
+        }
+
+        #pakistan-map-svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            margin: auto;
+        }
+        #pakistan-map-svg path, #pakistan-map-svg circle {
+            fill: rgba(167, 243, 208, 0.6); /* Made semi-transparent so markers are visible */
+            stroke: #34d399;
+            stroke-width: 0.5;
+            transition: fill 0.3s ease, transform 0.1s ease;
+            cursor: pointer;
+            pointer-events: auto; /* Ensure SVG paths are clickable */
+        }
+        #pakistan-map-svg path:hover, #pakistan-map-svg circle:hover {
+            fill: rgba(110, 231, 183, 0.7); /* Slightly less transparent on hover */
+            transform: scale(1.005);
+        }
+        #pakistan-map-svg path.selected, #pakistan-map-svg circle.selected {
+            fill: rgba(5, 150, 105, 0.8); /* Opaque and darker for selected */
+            stroke: #047857;
+            stroke-width: 1.5;
+        }
+        
+        /* Styles for the custom HTML chart blocks (re-added for stability) */
+        .chart-block-custom { /* Renamed to avoid conflicts with potential future Chart.js blocks */
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            opacity: 0; /* Initial state for animation */
+            transform: translateY(30px); /* Initial state for animation */
+            animation: slideIn 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards; /* Slide-in animation */
+            transition: box-shadow 0.4s ease, transform 0.4s ease;
+            margin-bottom: 1rem; /* Space between custom blocks */
+        }
+
+        .chart-block-custom:last-child {
+            margin-bottom: 0; /* No margin after the last block */
+        }
+        
+        .chart-block-custom:hover {
+            transform: translateY(20px) scale(1.02); /* Slight lift and scale on hover */
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08); /* Enhanced shadow on hover */
+        }
+
+        /* Keyframe animation for sliding in chart blocks */
+        @keyframes slideIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Apply fade-in to direct children of custom chart blocks */
+        .chart-block-custom > * {
+            opacity: 0;
+            animation: fadeIn 0.6s ease forwards;
+        }
+
+        /* Stagger animations for elements within custom chart blocks */
+        .chart-block-custom .chart-header-custom { animation-delay: 0.3s; } /* Renamed to avoid general conflicts */
+        .chart-block-custom .bar-wrapper-custom { animation-delay: 0.4s; }
+        .chart-block-custom .legend-custom { animation-delay: 0.5s; }
+        .chart-block-custom .metric-group-custom { animation-delay: 0.4s; }
+
+
+        .chart-header-custom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-header-custom h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .chart-header-custom h3 svg {
+            width: 20px;
+            height: 20px;
+            color: var(--text-secondary);
+        }
+
+        .chart-header-custom .value-label-custom {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+        
+        .value-label-custom .counter {
+            color: var(--text-primary);
+            font-weight: 700;
+        }
+
+        /* --- Bar Styles for custom blocks --- */
+        .bar-wrapper-custom {
+            height: 28px;
+            background-color: var(--bar-bg);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .bar-custom {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .segment-custom {
+            height: 100%;
+            width: 0; /* Initial width for animation */
+            animation: 
+                fillBar 1.5s cubic-bezier(0.23, 1, 0.32, 1) forwards,
+                pulse-bar 3s infinite ease-in-out;
+            animation-delay: var(--delay, 0.5s);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: filter 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .segment-custom:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+        .segment-custom:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+        
+        /* Tooltip */
+        .segment-custom::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%) scale(0.8);
+            background-color: var(--text-primary);
+            color: var(--card-bg);
+            padding: 0.3rem 0.6rem;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        
+        .segment-custom:hover::after {
+            opacity: 1;
+            transform: translateX(-50%) scale(1);
+        }
+
+        .segment-custom span {
+            opacity: 0;
+            animation: fadeIn 1s ease forwards;
+            animation-delay: calc(var(--delay, 0.5s) + 1s);
+        }
+
+        /* Keyframe animation for filling the bar segments */
+        @keyframes fillBar {
+            to { width: var(--width); }
+        }
+        
+        /* Keyframe animation for subtle pulsing effect on bars */
+        @keyframes pulse-bar {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.08); }
+        }
+
+        /* Specific colors for different bar segments */
+        .segment-custom.valid { background-color: var(--c-valid); }
+        .segment-custom.fake { background-color: var(--c-fake); color: var(--text-primary); }
+        .segment-custom.age-1 { background-color: var(--c-age1); }
+        .segment-custom.age-2 { background-color: var(--c-age2); }
+        .segment-custom.age-3 { background-color: var(--c-age3); }
+        .segment-custom.age-4 { background-color: var(--c-age4); }
+        .segment-custom.training { background-color: var(--c-training); animation-name: fillBar, pulse-bar; }
+        .segment-custom.handbooks { background-color: var(--c-handbooks); animation-name: fillBar, pulse-bar; }
+        
+        /* Legend styles */
+        .legend-custom {
+            display: flex;
+            gap: 1.5rem;
+            margin-top: 1rem;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .legend-item-custom {
+            display: flex;
+            align-items: center;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .legend-item-custom::before {
+            content: '';
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+            background-color: var(--color); /* Uses custom property for color */
+            margin-right: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-grid">
+        <header class="card header flex flex-row items-center justify-between !py-2">
+    <div class="flex items-center gap-4">
+        <img src="https://www.sdpi.org/assets/images/sdpi-logo-2020.webp" alt="SDPI Logo" class="h-6">
+    </div>
+
+    <div class="flex items-center justify-center gap-6 flex-grow">
+        <h1 class="text-xl font-extrabold text-gray-900 text-gradient-blue-purple">DFLT Phase-2 | Status Deck</h1>
+
+        <div class="flex items-center gap-2">
+            <label for="provinceFilter" class="text-xs font-medium text-gray-600">Province:</label>
+            <select id="provinceFilter" class="block py-1 px-2 border border-gray-300 bg-gray-50 text-gray-900 rounded-md shadow-sm focus:outline-none focus:ring-accent-main focus:border-accent-main text-xs" onchange="updateDashboard()">
+                <option value="All">All</option>
+            </select>
+        </div>
+        <div class="text-right">
+            <p id="currentTime" class="font-bold text-gray-900 text-lg"></p>
+            <p id="currentDate" class="text-xs text-gray-600"></p>
+        </div>
+    </div>
+
+    <img src="https://www.germany.info/blob/2529124/aa988891d4e112d3080c55f7560e90ac/germannew-data.png" alt="DFLT Logo" class="h-10">
+</header>
+
+        <div class="card map-card !p-1 relative">
+            <div id="map"></div>
+            <div class="absolute top-2 right-2 z-[1000] bg-white/70 p-1 rounded-lg border border-gray-200">
+                <button id="toggleHeatmap" class="px-3 py-1 text-xs text-white bg-indigo-600 rounded-md">Toggle Heatmap</button>
+            </div>
+            
+            <div id="alertsOverlay" style="display: none;">
+                <h3 class="text-md font-bold text-red-600 flex-shrink-0">Operational Alerts</h3>
+                <ul id="alertsList" class="text-sm space-y-2"></ul>
+            </div>
+
+            <div id="pakistan-svg-overlay" style="display: none;">
+                <svg id="pakistan-map-svg" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid meet">
+                    <path id="province-Punjab" d="M500 200 L700 300 L650 500 L450 400 Z" class="map-province" data-province-name="Punjab"></path>
+                    <path id="province-Sindh" d="M450 400 L650 500 L600 700 L400 600 Z" class="map-province" data-province-name="Sindh"></path>
+                    <path id="province-Khyber Pakhtunkhwa" d="M500 200 L400 100 L300 300 L450 400 Z" class="map-province" data-province-name="Khyber Pakhtunkhwa"></path>
+                    <path id="province-Balochistan" d="M400 600 L600 700 L400 750 L200 650 Z" class="map-province" data-province-name="Balochistan"></path>
+                    <path id="province-Azad Jammu & Kashmir" d="M700 300 L750 250 L700 150 L650 200 Z" class="map-province" data-province-name="Azad Jammu & Kashmir"></path>
+                    <path id="province-Gilgit-Baltistan" d="M400 100 L500 50 L600 100 L500 200 Z" class="map-province" data-province-name="Gilgit-Baltistan"></path>
+                    <circle cx="550" cy="280" r="10" fill="#facc15" stroke="#b45309" stroke-width="2" class="map-province" data-province-name="Islamabad Capital Territory"></circle>
+                </svg>
+            </div>
+        </div>
+        
+        <div class="kpi-main">
+            <div class="card justify-center">
+                <h3 class="text-sm font-medium text-gray-600 flex items-center justify-between">
+                    <span>Total Beneficiaries Trained</span>
+                    <span id="beneficiariesTargetPct" class="text-xs font-semibold text-teal-500">0%</span>
+                </h3>
+                <p id="totalBeneficiaries" class="text-4xl font-black text-indigo-600">0</p>
+                <span class="text-xs text-gray-500">Target: <span id="beneficiaryOverallTarget">0</span></span>
+            </div>
+            <div class="card justify-center">
+                <h3 class="text-sm font-medium text-gray-600 flex items-center justify-between">
+                    <span>Total Trainings Conducted</span>
+                    <span id="trainingsTargetPct" class="text-xs font-semibold text-emerald-500">0%</span>
+                </h3>
+                <p id="totalTrainings" class="text-4xl font-black text-indigo-600">0</p>
+                <span class="text-xs text-gray-500">Target: <span id="trainingOverallTarget">0</span></span>
+            </div>
+            <div class="card justify-center col-span-1">
+                <h3 class="text-sm font-medium text-gray-600">Top Performing Province</h3>
+                <p id="topProvinceName" class="text-2xl font-black text-blue-600 mt-1">N/A</p>
+                <p id="topProvincePct" class="text-xl font-bold text-blue-500 mt-0">0% Target Achieved</p>
+            </div>
+        </div>
+
+        <div class="card provincial-summary-card">
+            <div class="flex items-center justify-between flex-shrink-0 mb-4">
+                <h3 id="provincialSummaryTitle" class="text-md font-bold text-gray-800">Provincial Performance Overview</h3>
+                <div class="flex items-center gap-2">
+                    <label for="provincialCardFilter" class="text-xs font-medium text-gray-600">Filter:</label>
+                    <select id="provincialCardFilter" class="block py-1 px-2 border border-gray-300 bg-gray-50 text-gray-900 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-xs"></select>
+                </div>
+            </div>
+            <div id="provincialSummaryContent" class="flex-grow flex flex-col p-4">
+                <p class="text-gray-500 text-sm text-center">Select a province to view its performance details.</p>
+                </div>
+        </div>
+
+        <div class="card monthly-trend-card">
+            <h3 class="text-md font-bold text-gray-800 flex-shrink-0">Beneficiaries Trend (8 Months)</h3>
+            <div class="chart-filter-buttons">
+                <button class="chart-filter-button active" data-unit="month" data-metric="Beneficiary_Count_Actual">Monthly Beneficiaries</button>
+                <button class="chart-filter-button" data-unit="day" data-metric="Beneficiary_Count_Actual">Daily Beneficiaries</button>
+                <button class="chart-filter-button" data-unit="month" data-metric="Accounts_Opened_MW">Monthly Accounts</button>
+            </div>
+            <div class="chart-container"><canvas id="monthlyTrendChart"></canvas></div>
+        </div>
+
+        <div class="card provincial-ranking-card">
+            <h3 class="text-md font-bold text-gray-800 flex-shrink-0">Provincial Ranking (by Beneficiaries)</h3>
+            <div class="flex gap-2 mb-2">
+                <button class="chart-filter-button active" data-sort-metric="beneficiaries">By Beneficiaries</button>
+                <button class="chart-filter-button" data-sort-metric="trainings">By Trainings</button>
+                <button class="chart-filter-button" data-sort-metric="target_achievement">By Target %</button>
+            </div>
+            <div class="table-container mt-2">
+                <table class="w-full text-left text-sm">
+                    <thead class="text-xs text-gray-600 uppercase bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-2">Rank</th>
+                            <th class="px-4 py-2">Province</th>
+                            <th class="px-4 py-2">Beneficiaries</th>
+                            <th class="px-4 py-2">Trainings</th>
+                            <th class="px-4 py-2">Target %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="provincialRankingTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card leaderboard-card">
+            <h3 class="text-md font-bold text-gray-800 flex-shrink-0">Top Trainers (Monthly Ranking)</h3>
+            <div class="table-container mt-2">
+                <table class="w-full text-left text-sm">
+                    <thead class="text-xs text-gray-600 uppercase bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-2">Rank</th>
+                            <th class="px-4 py-2">Trainer</th>
+                            <th class="px-4 py-2">Beneficiaries</th>
+                            <th class="px-4 py-2">Target %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Function to generate realistic random data for the dashboard
+        function generateRandomTrainingData(numRecords = 1500) {
+            const provinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Azad Jammu & Kashmir", "Gilgit-Baltistan", "Islamabad Capital Territory"];
+            const districtsByProvince = {
+                "Punjab": ["Lahore", "Rawalpindi", "Faisalabad", "Multan", "Sialkot", "Gujranwala", "Bahawalpur", "Sargodha", "Gujrat", "Rahim Yar Khan"],
+                "Sindh": ["Karachi", "Hyderabad", "Sukkur", "Larkana", "Mirpur Khas", "Nawabshah", "Jacobabad", "Shikarpur", "Thatta"],
+                "Khyber Pakhtunkhwa": ["Peshawar", "Swat", "Mardan", "Abbottabad", "Kohat", "Bannu", "D.I. Khan", "Mansehra", "Haripur"],
+                "Balochistan": ["Quetta", "Khuzdar", "Gwadar", "Dera Bugti", "Sibi", "Turbat", "Loralai", "Chaman", "Zhob"],
+                "Azad Jammu & Kashmir": ["Muzaffarabad", "Mirpur", "Kotli", "Bhimber", "Neelum Valley", "Rawalakot"],
+                "Gilgit-Baltistan": ["Gilgit", "Skardu", "Ghanche", "Diamer", "Astore", "Hunza"],
+                "Islamabad Capital Territory": ["Islamabad"]
+            };
+            const aspcNames = ["Ayesha Khan", "Ahmed Shah", "Nida Khan", "Omar Farooq", "Rubina Iqbal", "Tariq Mahmood", "Yusra Khan", "Sana Ali", "Ali Raza", "Zara Saleem", "Usman Anwar", "Fatima Zahra", "Kamran Baig", "Hafsa Malik", "Iqbal Hussain", "Samina Butt", "Zainab Abbas", "Bilal Khan", "Amna Tariq", "Fahad Ali", "Hina Zahid", "Imran Khan", "Javeria Sohail", "Kashif Mehmood", "Laila Batool", "Mohsin Javed"];
+            const dutyStations = ["Karachi Hub", "Lahore HQ", "Peshawar Centre", "Quetta Branch", "Multan Field", "Hyderabad Support", "Islamabad Office", "Faisalabad Node", "Sialkot Operations", "Gwadar Port"];
+            const trainingTypes = ["Digital Literacy", "Financial Inclusion", "Entrepreneurship", "Basic IT Skills", "Cyber Security Awareness"];
+
+            const data = [];
+            const today = new Date();
+            const eightMonthsAgo = new Date(today);
+            eightMonthsAgo.setMonth(today.getMonth() - 7);
+            eightMonthsAgo.setDate(1); // Start from the 1st of the month 8 months ago
+
+            function getRandomInt(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
+            function getRandomFloat(min, max) {
+                return (Math.random() * (max - min) + min);
+            }
+
+            function getRandomDate(start, end) {
+                return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+            }
+
+            // Initialize trainer stats for Leaderboard
+            const trainerStats = {};
+            aspcNames.forEach(name => {
+                trainerStats[name] = { totalTrainings: getRandomInt(5, 20), totalBeneficiaries: getRandomInt(100, 500) };
+            });
+
+            for (let i = 1; i <= numRecords; i++) {
+                const randomProvince = provinces[getRandomInt(0, provinces.length - 1)];
+                const randomDistrict = districtsByProvince[randomProvince] ? districtsByProvince[randomProvince][getRandomInt(0, districtsByProvince[randomProvince].length - 1)] : "N/A";
+                const randomASPCName = aspcNames[getRandomInt(0, aspcNames.length - 1)];
+                const randomDutyStation = dutyStations[getRandomInt(0, dutyStations.length - 1)];
+                const randomDate = getRandomDate(eightMonthsAgo, today);
+                const randomTrainingType = trainingTypes[getRandomInt(0, trainingTypes.length - 1)];
+
+                const beneficiaryCount = getRandomInt(15, 40);
+                const sessionTargetAchievedPct = parseFloat(getRandomFloat(40, 100).toFixed(1));
+                const accountsOpenedMW = getRandomInt(0, Math.floor(beneficiaryCount * 0.3));
+                const accountsOpenedBank = getRandomInt(0, Math.floor(beneficiaryCount * 0.2));
+                const lastReportDaysAgo = getRandomInt(0, 10);
+                const avgTrainingTimeHours = parseFloat(getRandomFloat(3.5, 5.0).toFixed(1));
+                const maleBeneficiaries = getRandomInt(Math.floor(beneficiaryCount * 0.3), Math.floor(beneficiaryCount * 0.7));
+                const femaleBeneficiaries = beneficiaryCount - maleBeneficiaries;
+                const trainingSuccessRate = parseFloat(getRandomFloat(70, 99).toFixed(1));
+                const postTrainingEngagement = parseFloat(getRandomFloat(50, 90).toFixed(1));
+
+                // Ensure age groups sum up to beneficiaryCount
+                let age20_25 = getRandomInt(Math.floor(beneficiaryCount * 0.1), Math.floor(beneficiaryCount * 0.3));
+                let age26_35 = getRandomInt(Math.floor(beneficiaryCount * 0.2), Math.floor(beneficiaryCount * 0.5));
+                let age36_45 = getRandomInt(Math.floor(beneficiaryCount * 0.1), Math.floor(beneficiaryCount * 0.3));
+                let age45_Plus = beneficiaryCount - (age20_25 + age26_35 + age36_45);
+
+                if (age45_Plus < 0) { // Adjust if sum exceeds total due to random
+                    age45_Plus = 0;
+                    age36_45 = Math.max(0, beneficiaryCount - (age20_25 + age26_35)); // Readjust
+                }
+                const currentSum = age20_25 + age26_35 + age36_45 + age45_Plus;
+                if (currentSum !== beneficiaryCount) { // Final adjustment
+                    const diff = beneficiaryCount - currentSum;
+                    age26_35 += diff; // Add/subtract diff from a larger group
+                }
+
+                const fakeCNICCount = getRandomInt(0, Math.floor(beneficiaryCount * 0.05));
+                const totalAttendeesForFake_CNIC_Session = beneficiaryCount; // Assuming total attendees for CNIC check is the beneficiary count
+
+                // Simulate geographic coordinates within Pakistan (approximate bounds)
+                const latMin = 24.0, latMax = 37.0;
+                const lonMin = 60.0, lonMax = 78.0;
+                const startLocationLat = parseFloat(getRandomFloat(latMin, latMax).toFixed(4));
+                const startLocationLon = parseFloat(getRandomFloat(lonMin, lonMax).toFixed(4));
+
+                data.push({
+                    "TrainingID": i,
+                    "Training_Date": randomDate.toISOString().split('T')[0], // YYYY-MM-DD
+                    "Province": randomProvince,
+                    "District": randomDistrict,
+                    "ASPC_ID": `ASPC${getRandomInt(100, 150)}`, // Trainer ID
+                    "ASPC_Name": randomASPCName,
+                    "Duty_Station": randomDutyStation,
+                    "Beneficiary_Count_Actual": beneficiaryCount,
+                    "Session_Target_Achieved_Pct": sessionTargetAchievedPct,
+                    "Accounts_Opened_MW": accountsOpenedMW, // Mobile Wallet
+                    "Accounts_Opened_Bank": accountsOpenedBank,
+                    "Last_Report_Days_Ago": lastReportDaysAgo,
+                    "Trainer_Total_Trainings": trainerStats[randomASPCName].totalTrainings++,
+                    "Avg_Training_Time_Hours": avgTrainingTimeHours,
+                    "Age_Group_20_25": age20_25,
+                    "Age_Group_26_35": age26_35,
+                    "Age_Group_36_45": age36_45,
+                    "Age_Group_45_Plus": age45_Plus,
+                    "Male_Beneficiaries": maleBeneficiaries,
+                    "Female_Beneficiaries": femaleBeneficiaries,
+                    "Training_Type": randomTrainingType,
+                    "Training_Success_Rate_Pct": trainingSuccessRate,
+                    "Post_Training_Engagement_Pct": postTrainingEngagement,
+                    "Fake_CNIC_Count": fakeCNICCount,
+                    "Total_Attendees_For_Fake_CNIC_Session": totalAttendeesForFake_CNIC_Session,
+                    "Start_Location_Lat": startLocationLat,
+                    "Start_Location_Lon": startLocationLon
+                });
+            }
+            return data;
+        }
+
+        // Generate a smaller dataset for smoother performance in browser prototype
+        const trainingData = generateRandomTrainingData(150); 
+
+        // Leaflet map, marker and heatmap layers
+        let map, markers = L.featureGroup(), heatLayer;
+        let monthlyTrendChart; // Chart.js instance for the monthly trend
+
+        // Define overall and provincial targets
+        let globalTargets = {
+            provinces: {
+                "Punjab": {target_beneficiaries: 90000, target_trainings: 600},
+                "Sindh": {target_beneficiaries: 60000, target_trainings: 400},
+                "Khyber Pakhtunkhwa": {target_beneficiaries: 35000, target_trainings: 250},
+                "Balochistan": {target_beneficiaries: 20000, target_trainings: 150},
+                "Gilgit-Baltistan": {target_beneficiaries: 10000, target_trainings: 80},
+                "Azad Jammu & Kashmir": {target_beneficiaries: 15000, target_trainings: 100},
+                "Islamabad Capital Territory": {target_beneficiaries: 5000, target_trainings: 40}
+            },
+            totalBeneficiaryTarget: 0,
+            totalTrainingTarget: 0
+        };
+
+        // Calculate total global targets once
+        globalTargets.totalBeneficiaryTarget = Object.values(globalTargets.provinces).reduce((sum, p) => sum + p.target_beneficiaries, 0);
+        globalTargets.totalTrainingTarget = Object.values(globalTargets.provinces).reduce((sum, p) => sum + p.target_trainings, 0);
+
+        // Global variables to cache processed data (for performance)
+        let provinceDataSummary = {};
+        let aggregatedMonthlyTrendData = {};
+        let aggregatedDailyTrendData = {};
+        let provincialRankingsData = [];
+        let leaderboardData = [];
+        let systemAlerts = [];
+
+
+        const AVERAGE_CLASSROOM_HOURS_PER_DAY = 4;
+        const MONTHLY_TARGET_PER_TRAINER = 240; // Example target for trainer leaderboard
+
+        // Define a color palette for charts and map markers
+        const CHART_COLORS = {
+            primary: '#4f46e5', // Indigo
+            secondary: '#2dd4bf', // Teal
+            tertiary: '#fbbf24', // Amber
+            danger: '#ef4444', // Red
+            info: '#60a5fa', // Blue
+            success: '#34d399', // Green
+            background: '#f3f4f6', // Light gray background for charts
+            text: '#1f2937', // Dark gray text
+            gray: '#d1d5db',
+            lightBlue: '#bfdbfe',
+            lightGreen: '#d1fae5',
+            lightYellow: '#fef3c7',
+            lightRed: '#fee2e2',
+            lightPurple: '#e9d5ff'
+        };
+
+        // Custom colors for provinces on the map markers
+        const provinceColors = {
+            "Punjab": "#22c55e",
+            "Sindh": "#3b82f6",
+            "Khyber Pakhtunkhwa": "#f97316",
+            "Balochistan": "#ef4444",
+            "Gilgit-Baltistan": "#a855f7",
+            "Azad Jammu & Kashmir": "#06b6d4",
+            "Islamabad Capital Territory": "#facc15"
+        };
+
+
+        // --- Event Listeners and Initial Setup ---
+        document.addEventListener('DOMContentLoaded', () => {
+            updateTime(); // Display current time and date
+            setInterval(updateTime, 1000); // Update time every second
+
+            if (!trainingData || trainingData.length === 0) {
+                console.error("Mock data is missing or empty!");
+                alert("Could not load mock data. Dashboard cannot be displayed.");
+                return;
+            }
+            
+            console.log("Data loaded:", trainingData.length, "rows");
+
+            // Perform all heavy data processing once here to optimize performance
+            preProcessAllData(trainingData);
+
+            populateFilters(trainingData); // Populates main header filter
+            populateProvincialCardFilter(trainingData); // Populates the new card-specific filter
+
+            initializeMap(); // Setup the Leaflet map
+            initializeCharts(); // Initializes only Monthly Trend Chart (other charts are dynamic HTML)
+            
+            updateDashboard(); // Initial call to render all dashboard elements based on 'All Provinces' filter
+
+            // Set initial state for Provincial Summary card
+            const initialProvincialCardFilterValue = document.getElementById('provincialCardFilter').value;
+            if (initialProvincialCardFilterValue !== 'All' && initialProvincialCardFilterValue !== 'Select Province') {
+                updateProvincialSummaryContent(initialProvincialCardFilterValue);
+            } else {
+                document.getElementById('provincialSummaryContent').innerHTML = `<p class="text-gray-500 text-sm text-center">Select a province to view its performance details.</p>`;
+                document.getElementById('provincialSummaryTitle').textContent = `Provincial Performance Overview`;
+            }
+
+            // Event listener for Monthly Trend Chart filter buttons
+            document.querySelector('.monthly-trend-card .chart-filter-buttons').addEventListener('click', (event) => {
+                if (event.target.classList.contains('chart-filter-button')) {
+                    document.querySelector('.monthly-trend-card .chart-filter-buttons').querySelectorAll('.chart-filter-button').forEach(btn => btn.classList.remove('active'));
+                    event.target.classList.add('active');
+                    updateMonthlyTrendChart(); // Redraw chart with new unit/metric (data comes from pre-processed globals)
+                }
+            });
+
+            // Event listener for Provincial Ranking sorting buttons
+            document.querySelector('.provincial-ranking-card .flex.gap-2').addEventListener('click', (event) => {
+                if (event.target.classList.contains('chart-filter-button')) {
+                    document.querySelector('.provincial-ranking-card .flex.gap-2').querySelectorAll('.chart-filter-button').forEach(btn => btn.classList.remove('active'));
+                    event.target.classList.add('active');
+                    updateProvincialRanking(); // Update ranking table (data comes from pre-processed globals)
+                }
+            });
+
+            // Event listener for Heatmap toggle button
+            document.getElementById('toggleHeatmap').addEventListener('click', toggleHeatmap);
+
+            // Map click handler (only updates main filter, doesn't directly trigger provincial card)
+            // This is attached to the SVG map element itself, which is now a Leaflet control
+            document.getElementById('pakistan-map-svg').addEventListener('click', (event) => {
+                let targetElement = event.target;
+                // Traverse up the DOM tree to find the province path/circle
+                while (targetElement && targetElement !== this && !targetElement.dataset.provinceName) {
+                    targetElement = targetElement.parentNode;
+                }
+
+                if (targetElement && targetElement.dataset.provinceName) {
+                    const provinceName = targetElement.dataset.provinceName;
+                    document.getElementById('provinceFilter').value = provinceName; // Update main filter
+                    updateDashboard(); // Re-render dashboard elements controlled by main filter
+
+                    // Map selection can optionally update the card's filter as well for sync
+                    // if (document.getElementById('provincialCardFilter').value !== provinceName) {
+                    //      document.getElementById('provincialCardFilter').value = provinceName;
+                    //      updateProvincialSummaryContent(provinceName);
+                    // }
+                } else {
+                    document.getElementById('provinceFilter').value = 'All'; // Reset main filter
+                    updateDashboard(); // Re-render dashboard elements controlled by main filter
+                }
+            });
+
+            // New: Listener for the Provincial Summary card's specific filter
+            document.getElementById('provincialCardFilter').addEventListener('change', (event) => {
+                const selectedProvince = event.target.value;
+                if (selectedProvince !== 'All' && selectedProvince !== 'Select Province') {
+                    updateProvincialSummaryContent(selectedProvince);
+                } else {
+                    document.getElementById('provincialSummaryContent').innerHTML = `<p class="text-gray-500 text-sm text-center">Select a province to view its performance details.</p>`;
+                    document.getElementById('provincialSummaryTitle').textContent = `Provincial Performance Overview`;
+                }
+                // Also update the map's selected province if the card filter changes (for visual consistency on map)
+                document.querySelectorAll('#pakistan-map-svg path, #pakistan-map-svg circle').forEach(path => path.classList.remove('selected'));
+                if (selectedProvince !== 'All') {
+                    const svgProvinceElement = document.querySelector(`#pakistan-map-svg [data-province-name="${selectedProvince}"]`);
+                    if (svgProvinceElement) {
+                        svgProvinceElement.classList.add('selected');
+                    }
+                }
+            });
+        });
+
+        // --- Data Pre-processing ---
+        function preProcessAllData(data) {
+            // Pre-calculate Provincial Summary (existing logic, now explicitly part of pre-processing)
+            provinceDataSummary = {};
+            data.forEach(item => {
+                const provinceName = item.Province;
+                if (!provinceDataSummary[provinceName]) {
+                    provinceDataSummary[provinceName] = {
+                        trainings: 0,
+                        beneficiaries: 0,
+                        accounts: 0,
+                        total_training_time: 0,
+                        training_count_for_avg_time: 0,
+                        age_groups: {'20-25': 0, '26-35': 0, '36-45': 0, '45+': 0},
+                        fake_cnics: 0,
+                        total_attendees_for_fake_cnic: 0,
+                        male_beneficiaries: 0,
+                        female_beneficiaries: 0,
+                        training_types: {},
+                        training_success_rate_sum: 0,
+                        training_success_rate_count: 0,
+                        post_training_engagement_sum: 0,
+                        post_training_engagement_count: 0
+                    };
+                }
+                provinceDataSummary[provinceName].trainings++;
+                provinceDataSummary[provinceName].beneficiaries += item.Beneficiary_Count_Actual || 0;
+                provinceDataSummary[provinceName].accounts += (item.Accounts_Opened_MW || 0) + (item.Accounts_Opened_Bank || 0);
+
+                if (item.Avg_Training_Time_Hours) {
+                    provinceDataSummary[provinceName].total_training_time += parseFloat(item.Avg_Training_Time_Hours);
+                    provinceDataSummary[provinceName].training_count_for_avg_time++;
+                }
+
+                provinceDataSummary[provinceName].age_groups['20-25'] += item.Age_Group_20_25 || 0;
+                provinceDataSummary[provinceName].age_groups['26-35'] += item.Age_Group_26_35 || 0;
+                provinceDataSummary[provinceName].age_groups['36-45'] += item.Age_Group_36_45 || 0;
+                provinceDataSummary[provinceName].age_groups['45+'] += item.Age_Group_45_Plus || 0;
+
+                provinceDataSummary[provinceName].male_beneficiaries += item.Male_Beneficiaries || 0;
+                provinceDataSummary[provinceName].female_beneficiaries += item.Female_Beneficiaries || 0;
+
+                const type = item.Training_Type || 'Other';
+                provinceDataSummary[provinceName].training_types[type] = (provinceDataSummary[provinceName].training_types[type] || 0) + 1;
+
+                if (item.Training_Success_Rate_Pct) {
+                    provinceDataSummary[provinceName].training_success_rate_sum += item.Training_Success_Rate_Pct;
+                    provinceDataSummary[provinceName].training_success_rate_count++;
+                }
+                if (item.Post_Training_Engagement_Pct) {
+                    provinceDataSummary[provinceName].post_training_engagement_sum += item.Post_Training_Engagement_Pct;
+                    provinceDataSummary[provinceName].post_training_engagement_count++;
+                }
+
+                provinceDataSummary[provinceName].fake_cnics += item.Fake_CNIC_Count || 0;
+                provinceDataSummary[provinceName].total_attendees_for_fake_cnic += item.Total_Attendees_For_Fake_CNIC_Session || 0;
+            });
+
+            // Pre-process Monthly and Daily Trend Data
+            aggregatedMonthlyTrendData = {};
+            aggregatedDailyTrendData = {};
+            const allDates = data.map(item => new Date(item.Training_Date));
+            const latestDate = allDates.length > 0 ? new Date(Math.max(...allDates)) : new Date();
+            const eightMonthsAgo = new Date(latestDate);
+            eightMonthsAgo.setMonth(latestDate.getMonth() - 7);
+            eightMonthsAgo.setDate(1);
+
+            data.forEach(item => {
+                const date = new Date(item.Training_Date);
+                if (date >= eightMonthsAgo && date <= latestDate) {
+                    const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-01`;
+                    const dayKey = date.toISOString().split('T')[0];
+
+                    aggregatedMonthlyTrendData[monthKey] = aggregatedMonthlyTrendData[monthKey] || { Beneficiary_Count_Actual: 0, Accounts_Opened_MW: 0 };
+                    aggregatedDailyTrendData[dayKey] = aggregatedDailyTrendData[dayKey] || { Beneficiary_Count_Actual: 0, Accounts_Opened_MW: 0 };
+
+                    aggregatedMonthlyTrendData[monthKey].Beneficiary_Count_Actual += (item.Beneficiary_Count_Actual || 0);
+                    aggregatedMonthlyTrendData[monthKey].Accounts_Opened_MW += (item.Accounts_Opened_MW || 0);
+
+                    aggregatedDailyTrendData[dayKey].Beneficiary_Count_Actual += (item.Beneficiary_Count_Actual || 0);
+                    aggregatedDailyTrendData[dayKey].Accounts_Opened_MW += (item.Accounts_Opened_MW || 0);
+                }
+            });
+
+            // Fill in missing dates for trend charts to ensure continuous lines
+            let currentDateIterator = new Date(eightMonthsAgo);
+            while (currentDateIterator <= latestDate) {
+                const monthKey = `${currentDateIterator.getFullYear()}-${(currentDateIterator.getMonth() + 1).toString().padStart(2, '0')}-01`;
+                const dayKey = currentDateIterator.toISOString().split('T')[0];
+
+                if (!aggregatedMonthlyTrendData[monthKey]) aggregatedMonthlyTrendData[monthKey] = { Beneficiary_Count_Actual: 0, Accounts_Opened_MW: 0 };
+                if (!aggregatedDailyTrendData[dayKey]) aggregatedDailyTrendData[dayKey] = { Beneficiary_Count_Actual: 0, Accounts_Opened_MW: 0 };
+                
+                // Advance date by day
+                currentDateIterator.setDate(currentDateIterator.getDate() + 1);
+            }
+
+
+            // Pre-process Provincial Rankings
+            const provincialPerformance = {};
+            for (const pName in globalTargets.provinces) {
+                provincialPerformance[pName] = {
+                    beneficiaries: 0,
+                    trainings: 0,
+                    target_beneficiaries: globalTargets.provinces[pName].target_beneficiaries,
+                    target_trainings: globalTargets.provinces[pName].target_trainings
+                };
+            }
+            data.forEach(item => {
+                const provinceName = item.Province;
+                if (provincialPerformance[provinceName]) {
+                    provincialPerformance[provinceName].beneficiaries += (item.Beneficiary_Count_Actual || 0);
+                    provincialPerformance[provinceName].trainings++;
+                }
+            });
+            provincialRankingsData = Object.entries(provincialPerformance).map(([provinceName, stats]) => {
+                const beneficiaryTargetPct = stats.target_beneficiaries > 0 ? (stats.beneficiaries / stats.target_beneficiaries) * 100 : 0;
+                const trainingTargetPct = stats.target_trainings > 0 ? (stats.trainings / stats.target_trainings) * 100 : 0;
+                return {
+                    province: provinceName,
+                    beneficiaries: stats.beneficiaries,
+                    trainings: stats.trainings,
+                    beneficiary_target_pct: beneficiaryTargetPct,
+                    training_target_pct: trainingTargetPct
+                };
+            });
+
+            // Pre-process Leaderboard Data (for current month)
+            const now = new Date();
+            const monthlyData = data.filter(item => {
+                const trainingDate = new Date(item.Training_Date);
+                return trainingDate.getMonth() === now.getMonth() && trainingDate.getFullYear() === now.getFullYear();
+            });
+            const trainerPerformance = monthlyData.reduce((acc, item) => {
+                const trainerName = item.ASPC_Name;
+                if (trainerName) {
+                    if (!acc[trainerName]) acc[trainerName] = { beneficiaries: 0, trainings: 0 };
+                    acc[trainerName].beneficiaries += (item.Beneficiary_Count_Actual || 0);
+                    acc[trainerName].trainings++;
+                }
+                return acc;
+            }, {});
+            leaderboardData = Object.entries(trainerPerformance).map(([name, stats]) => {
+                const percent = Math.min(100, Math.round((stats.beneficiaries / MONTHLY_TARGET_PER_TRAINER) * 100));
+                return { name, beneficiaries: stats.beneficiaries, target_pct: percent };
+            }).sort((a, b) => b.beneficiaries - a.beneficiaries).slice(0, 5); // Get top 5
+
+            // Pre-process Alerts
+            systemAlerts = [];
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7); // Alerts for data from the last 7 days
+            const recentData = data.filter(item => {
+                const trainingDate = new Date(item.Training_Date);
+                return trainingDate >= oneWeekAgo;
+            });
+
+            const lateReports = recentData.filter(item => (item.Last_Report_Days_Ago || 0) > 3);
+            lateReports.slice(0, 3).forEach(item => { // Limit to 3 alerts of each type
+                systemAlerts.push({
+                    type: 'late-report',
+                    message: `<p class="font-bold text-yellow-700 text-xs">${item.ASPC_Name}</p><p class="text-xs text-gray-600">No report in ${item.Last_Report_Days_Ago} days (last training: ${item.Training_Date}).</p>`,
+                    className: 'bg-yellow-100 border border-yellow-300 rounded-lg'
+                });
+            });
+            
+            const lowAttendance = recentData.filter(d => (d.Beneficiary_Count_Actual || 0) < 15);
+            lowAttendance.slice(0, 3).forEach(item => {
+                systemAlerts.push({
+                    type: 'low-attendance',
+                    message: `<p class="font-bold text-red-700 text-xs">${item.ASPC_Name} in ${item.District}</p><p class="text-xs text-gray-600">Low attendance (${item.Beneficiary_Count_Actual}) on ${item.Training_Date}.</p>`,
+                    className: 'bg-red-100 border border-red-300 rounded-lg'
+                });
+            });
+
+            const highFakeCNIC = recentData.filter(d => (d.Fake_CNIC_Count || 0) > (d.Total_Attendees_For_Fake_CNIC_Session || 1) * 0.03); // >3% fake CNICs
+            highFakeCNIC.slice(0, 3).forEach(item => {
+                systemAlerts.push({
+                    type: 'high-fake-cnic',
+                    message: `<p class="font-bold text-orange-700 text-xs">${item.ASPC_Name} in ${item.District}</p><p class="text-xs text-gray-600">High fake CNIC count (${item.Fake_CNIC_Count}) on ${item.Training_Date}.</p>`,
+                    className: 'bg-orange-100 border border-orange-300 rounded-lg'
+                });
+            });
+
+            const lowSessionTarget = recentData.filter(d => (d.Session_Target_Achieved_Pct || 0) < 60); // Target achievement below 60%
+            lowSessionTarget.slice(0, 3).forEach(item => {
+                systemAlerts.push({
+                    type: 'low-session-target',
+                    message: `<li class="p-2 bg-purple-100 border border-purple-300 rounded-lg"><p class="font-bold text-purple-700 text-xs">${item.ASPC_Name} in ${item.District}</p><p class="text-xs text-gray-600">Low session target achievement (${item.Session_Target_Achieved_Pct}%) on ${item.Training_Date}.</p></li>`,
+                    className: 'bg-purple-100 border border-purple-300 rounded-lg'
+                });
+            });
+
+            console.log("All data pre-processed.");
+        }
+
+
+        // --- UI Update Functions ---
+
+        // Update current time and date in the header
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        }
+
+        // Populate the main province filter dropdown
+        function populateFilters(data) {
+            const provinceFilter = document.getElementById('provinceFilter');
+            provinceFilter.innerHTML = '<option value="All">All Provinces</option>';
+            [...new Set(data.map(item => item.Province).filter(Boolean))].sort().forEach(p => {
+                provinceFilter.add(new Option(p, p));
+            });
+        }
+
+        // Populate the provincial summary card's filter dropdown
+        function populateProvincialCardFilter(data) {
+            const provincialCardFilter = document.getElementById('provincialCardFilter');
+            provincialCardFilter.innerHTML = '<option value="All">Select Province</option><option value="Punjab" selected>Punjab</option>';
+            [...new Set(data.map(item => item.Province).filter(Boolean))].sort().forEach(p => {
+                provincialCardFilter.add(new Option(p, p));
+            });
+        }
+
+
+        // Initialize Leaflet Map
+        function initializeMap() {
+            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([30.3753, 69.3451], 5.5); // Centered on Pakistan, moderate zoom
+            
+            // Add a base tile layer (light mode for better visibility with colorful markers)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>'
+            }).addTo(map);
+
+            // Initialize marker and heatmap layers as FeatureGroups
+            markers = L.featureGroup().addTo(map);
+            heatLayer = L.heatLayer([], {
+                radius: 25,
+                blur: 15,
+                maxZoom: 10,
+                gradient: { 0.4: '#60a5fa', 0.65: '#2dd4bf', 1: '#ef4444' } // Blue to Teal to Red gradient
+            });
+
+            // Add custom Leaflet controls for alerts and SVG overlay
+            const alertsOverlayDiv = document.getElementById('alertsOverlay');
+            const alertsControl = L.control({ position: 'bottomleft' });
+            alertsControl.onAdd = function (map) {
+                // Prevent map clicks from propagating to the overlay
+                L.DomEvent.disableClickPropagation(alertsOverlayDiv);
+                alertsOverlayDiv.style.display = 'flex'; // Ensure it's visible if alerts exist
+                return alertsOverlayDiv;
+            };
+            alertsControl.addTo(map);
+
+            const svgOverlayDiv = document.getElementById('pakistan-svg-overlay');
+            const svgControl = L.control({ position: 'topleft' });
+            svgControl.onAdd = function (map) {
+                L.DomEvent.disableClickPropagation(svgOverlayDiv);
+                return svgOverlayDiv;
+            };
+            svgControl.addTo(map);
+
+            // Adjust SVG overlay position and size with map movements
+            map.on('moveend zoomend resize', () => {
+                const mapBounds = map.getBounds();
+                const southWest = map.latLngToContainerPoint(mapBounds.getSouthWest());
+                const northEast = map.latLngToContainerPoint(mapBounds.getNorthEast());
+
+                const svgContainer = document.querySelector('.leaflet-control-pakistan-svg-overlay');
+                if (svgContainer) {
+                    // Position and size the SVG container to cover the map viewport
+                    svgContainer.style.left = `${southWest.x}px`;
+                    svgContainer.style.top = `${northEast.y}px`;
+                    svgContainer.style.width = `${northEast.x - southWest.x}px`;
+                    svgContainer.style.height = `${southWest.y - northEast.y}px`;
+                }
+            });
+            map.fire('moveend'); // Trigger initial positioning
+        }
+
+
+        // Initialize Chart.js charts (only for the dynamic canvas ones)
+        function initializeCharts() {
+            const ticksColor = CHART_COLORS.text, gridColor = '#e5e7eb';
+            const defaultOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false, labels: { color: ticksColor, font: { family: 'Montserrat' } } },
+                    tooltip: {
+                        titleColor: CHART_COLORS.text, bodyColor: CHART_COLORS.text,
+                        backgroundColor: '#fff', borderColor: '#d1d5db', borderWidth: 1,
+                        boxPadding: 4, bodyFont: { family: 'Montserrat' }, titleFont: { family: 'Montserrat' },
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: ticksColor, font: { family: 'Montserrat' } }, grid: { color: gridColor } },
+                    y: { ticks: { color: ticksColor, font: { family: 'Montserrat' } }, grid: { color: gridColor } }
+                }
+            };
+
+            monthlyTrendChart = new Chart(document.getElementById('monthlyTrendChart').getContext('2d'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ data: [], borderWidth: 2, tension: 0.3, pointRadius: 3, pointBackgroundColor: CHART_COLORS.primary, borderColor: CHART_COLORS.primary, fill: 'start', backgroundColor: 'rgba(79, 70, 229, 0.1)' }] },
+                options: {
+                    ...defaultOptions,
+                    scales: {
+                        x: { type: 'time', time: { unit: 'month' }, ticks: { color: ticksColor, font: { family: 'Montserrat' } }, grid: { color: gridColor } },
+                        y: { beginAtZero: true, ticks: { color: ticksColor, font: { family: 'Montserrat' } }, grid: { color: gridColor } }
+                    },
+                    plugins: {
+                        ...defaultOptions.plugins,
+                        annotation: {
+                            annotations: {
+                                targetLine: {
+                                    type: 'line', yScaleID: 'y', value: 0, borderColor: CHART_COLORS.danger,
+                                    borderWidth: 2, borderDash: [6, 6],
+                                    label: {
+                                        content: 'Target', enabled: true, position: 'end',
+                                        color: CHART_COLORS.danger, font: { family: 'Montserrat', size: 10 }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Toggle between marker layer and heatmap layer on the map
+        function toggleHeatmap() {
+            const svgOverlay = document.querySelector('.leaflet-control-pakistan-svg-overlay');
+            if (map.hasLayer(heatLayer)) {
+                map.removeLayer(heatLayer);
+                map.addLayer(markers);
+                if (svgOverlay) svgOverlay.style.display = 'flex'; // Show SVG when heatmap is off
+            } else {
+                map.removeLayer(markers);
+                map.addLayer(heatLayer);
+                if (svgOverlay) svgOverlay.style.display = 'none'; // Hide SVG when heatmap is on
+            }
+        }
+
+        // Main function to update all dashboard components
+        function updateDashboard() {
+            const mainFilterValue = document.getElementById('provinceFilter').value;
+            const filteredData = trainingData.filter(item => mainFilterValue === 'All' || item.Province === mainFilterValue);
+
+            updateKPIs(filteredData, mainFilterValue);
+            updateMapAndHeatmap(filteredData);
+            updateLeaderboard(); // Now uses pre-processed data
+            updateProvincialRanking(); // Now uses pre-processed data
+
+            // Determine current chart unit and metric to update monthly trend chart
+            const activeUnitButton = document.querySelector('.monthly-trend-card .chart-filter-buttons .active');
+            const currentUnit = activeUnitButton ? activeUnitButton.dataset.unit : 'month';
+            const currentMetric = activeUnitButton ? activeUnitButton.dataset.metric : 'Beneficiary_Count_Actual';
+            updateMonthlyTrendChart(filteredData, currentUnit, currentMetric); // Still needs filteredData for chart
+
+            // Update SVG map province selection visual
+            document.querySelectorAll('#pakistan-map-svg path, #pakistan-map-svg circle').forEach(path => path.classList.remove('selected'));
+            if (mainFilterValue !== 'All') {
+                const svgProvinceElement = document.querySelector(`#pakistan-map-svg [data-province-name="${mainFilterValue}"]`);
+                if (svgProvinceElement) {
+                    svgProvinceElement.classList.add('selected');
+                }
+            }
+            
+            updateAlerts(); // Now uses pre-processed data
+        }
+
+        // Animation for counter values (e.g., in KPIs)
+        function animateValue(obj, start, end, duration, isPercent = false) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                // Handle decimals for percentages and other float values
+                const value = (isPercent || obj.hasAttribute('data-decimals')) ? (start + progress * (end - start)).toFixed(obj.getAttribute('data-decimals') || 0) : Math.floor(start + progress * (end - start));
+                obj.innerHTML = value.toLocaleString() + (isPercent && obj.hasAttribute('data-decimals') === false ? '%' : '');
+                if (progress < 1) window.requestAnimationFrame(step);
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // Update Key Performance Indicators (KPIs)
+        function updateKPIs(data, currentFilterProvince) {
+            const totalBeneficiaries = data.reduce((s, i) => s + (i.Beneficiary_Count_Actual || 0), 0);
+            const totalTrainings = data.length;
+
+            let overallBeneficiaryTarget = 0;
+            let overallTrainingTarget = globalTargets.totalTrainingTarget; // Default to global target
+
+            if (currentFilterProvince === 'All') {
+                overallBeneficiaryTarget = globalTargets.totalBeneficiaryTarget;
+            } else {
+                const provinceData = globalTargets.provinces[currentFilterProvince];
+                overallBeneficiaryTarget = provinceData ? provinceData.target_beneficiaries : 0;
+                
+                // Adjust overall training target proportionally to province beneficiary target if a province is filtered
+                const totalGlobalBeneficiaryTarget = Object.values(globalTargets.provinces).reduce((sum, p) => sum + p.target_beneficiaries, 0);
+                const provinceBeneficiaryTargetRatio = totalGlobalBeneficiaryTarget > 0 ? (overallBeneficiaryTarget / totalGlobalBeneficiaryTarget) : 0;
+                overallTrainingTarget = Math.max(1, Math.round(globalTargets.totalTrainingTarget * provinceBeneficiaryTargetRatio));
+            }
+            
+            const beneficiariesTargetPct = overallBeneficiaryTarget > 0 ? ((totalBeneficiaries / overallBeneficiaryTarget) * 100).toFixed(1) : '0';
+            const trainingsTargetPct = overallTrainingTarget > 0 ? ((totalTrainings / overallTrainingTarget) * 100).toFixed(1) : '0';
+
+            animateValue(document.getElementById('totalBeneficiaries'), parseInt(document.getElementById('totalBeneficiaries').textContent.replace(/,/g, '') || '0'), totalBeneficiaries, 1000);
+            document.getElementById('beneficiariesTargetPct').textContent = `${beneficiariesTargetPct}% Target`;
+            document.getElementById('beneficiaryOverallTarget').textContent = overallBeneficiaryTarget.toLocaleString();
+
+            animateValue(document.getElementById('totalTrainings'), parseInt(document.getElementById('totalTrainings').textContent.replace(/,/g, '') || '0'), totalTrainings, 1000);
+            document.getElementById('trainingsTargetPct').textContent = `${trainingsTargetPct}% Target`;
+            document.getElementById('trainingOverallTarget').textContent = overallTrainingTarget.toLocaleString();
+
+            // Find top performing province
+            let topProvince = null;
+            let maxProvinceAchievedPct = -1;
+
+            for (const pName in globalTargets.provinces) {
+                // Use pre-summarized data
+                const summarizedProvince = provinceDataSummary[pName];
+                if (summarizedProvince) {
+                    const currentBeneficiaries = summarizedProvince.beneficiaries;
+                    const provinceTarget = globalTargets.provinces[pName].target_beneficiaries;
+                    const achievedPct = provinceTarget > 0 ? (currentBeneficiaries / provinceTarget) * 100 : 0;
+
+                    if (achievedPct > maxProvinceAchievedPct) {
+                        maxProvinceAchievedPct = achievedPct;
+                        topProvince = pName;
+                    }
+                }
+            }
+            document.getElementById('topProvinceName').textContent = topProvince || 'N/A';
+            document.getElementById('topProvincePct').textContent = `${maxProvinceAchievedPct.toFixed(1)}% Target Achieved`;
+        }
+
+        // Update the map markers and heatmap based on filtered data
+        function updateMapAndHeatmap(data) {
+            markers.clearLayers(); // Clear existing markers
+            const heatPoints = [];
+            const maxBeneficiaryCount = Math.max(...data.map(item => item.Beneficiary_Count_Actual || 0), 1); // Get max for heatmap weight
+
+            data.forEach(item => {
+                const lat = parseFloat(item.Start_Location_Lat);
+                const lon = parseFloat(item.Start_Location_Lon);
+
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    const latLng = [lat, lon];
+                    heatPoints.push([...latLng, (item.Beneficiary_Count_Actual || 0) / maxBeneficiaryCount]); // Add weighted point for heatmap
+                    
+                    // Dynamic marker size based on beneficiary count
+                    const markerSize = 14 + ((item.Beneficiary_Count_Actual || 0) / maxBeneficiaryCount) * 20; 
+                    
+                    // Custom HTML marker with pulse animation
+                    const markerIcon = L.divIcon({
+                        html: `
+                            <div style="position: relative; display: flex; align-items: center; justify-content: center;">
+                                <div class="location-dot-pulse" style="width:${markerSize*1.5}px; height:${markerSize*1.5}px; background-color:${provinceColors[item.Province] || '#4f46e5'}1A;"></div>
+                                <div class="location-dot" style="width:${markerSize}px; height:${markerSize}px; background-color:${provinceColors[item.Province] || '#4f46e5'};">
+                                    <svg viewBox="0 0 24 24" fill="white" width="${markerSize*0.6}" height="${markerSize*0.6}">
+                                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/>
+                                    </svg>
+                                </div>
+                            </div>`,
+                        className: 'leaflet-div-icon',
+                        iconSize: [markerSize * 1.5, markerSize * 1.5], // Adjust icon size to include pulse
+                        iconAnchor: [markerSize * 0.75, markerSize * 0.75]
+                    });
+
+                    // Popup content for markers
+                    const popupContent = `
+                        <div style="font-family: 'Montserrat', sans-serif; color: #1f2937;">
+                            <div class="font-bold text-base mb-1">${item.ASPC_Name || 'N/A'}</div>
+                            <div class="text-xs text-gray-600 mb-2">Duty Station: ${item.Duty_Station || 'N/A'}</div>
+                            <div class="text-sm text-gray-700"><strong>Beneficiaries:</strong> <span class="text-indigo-600 font-bold">${item.Beneficiary_Count_Actual || 0}</span></div>
+                            <div class="text-sm text-gray-700"><strong>Target Achieved:</strong> <span class="${parseFloat(item.Session_Target_Achieved_Pct) >= 100 ? 'text-green-600' : 'text-orange-500'} font-bold">${item.Session_Target_Achieved_Pct || '0'}%</span></div>
+                            <div class="text-sm text-gray-700"><strong>Under IC:</strong> ${item.ASPC_ID || 'N/A'}</div>
+                            <div class="text-sm text-gray-700"><strong>Total Trainings by Trainer:</strong> ${item.Trainer_Total_Trainings || 'N/A'}</div>
+                            <div class="text-xs text-gray-500 mt-2">Date: ${item.Training_Date || 'N/A'} in ${item.District || 'N/A'}, ${item.Province || 'N/A'}</div>
+                        </div>`;
+
+                    L.marker(latLng, { icon: markerIcon })
+                        .bindPopup(popupContent, { maxWidth: 250 })
+                        .addTo(markers);
+                }
+            });
+
+            heatLayer.setLatLngs(heatPoints); // Update heatmap data
+            // Adjust map view to fit markers if present, otherwise default view
+            if (markers.getLayers().length > 0) {
+                map.fitBounds(markers.getBounds().pad(0.1));
+            } else {
+                map.setView([30.3753, 69.3451], 5.5);
+            }
+        }
+        
+        // Counter animation for numerical values
+        const animateCounter = (counter) => {
+            const target = +counter.getAttribute('data-target');
+            const decimals = +counter.getAttribute('data-decimals') || 0;
+            const speed = 100; // Number of animation frames
+
+            const updateCount = () => {
+                const count = parseFloat(counter.innerText);
+                const increment = target / speed;
+                
+                if (count < target) {
+                    const newCount = Math.min(count + increment, target);
+                    counter.innerText = newCount.toFixed(decimals);
+                    requestAnimationFrame(updateCount);
+                } else {
+                    counter.innerText = target.toFixed(decimals);
+                }
+            };
+            updateCount();
+        };
+
+        // Observe elements for animation when they enter the viewport
+        const createAndObserveChartBlocks = () => {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+
+                        const countersInView = entry.target.querySelectorAll('.counter');
+                        countersInView.forEach(animateCounter);
+
+                        entry.target.querySelectorAll('.segment-custom').forEach(segment => {
+                            // Trigger reflow to restart CSS animation
+                            segment.style.width = '0';
+                            void segment.offsetWidth; 
+                            segment.style.setProperty('--width', segment.dataset.width);
+                        });
+
+                        observer.unobserve(entry.target); // Stop observing once animated
+                    }
+                });
+            }, { threshold: 0.5 }); // Trigger when 50% of the element is visible
+
+            document.querySelectorAll('#provincialSummaryContent .chart-block-custom').forEach(block => {
+                block.style.opacity = '0'; // Initial state for re-animation on re-render
+                block.style.transform = 'translateY(30px)';
+                observer.observe(block);
+            });
+
+            // Also trigger for elements already in viewport on load
+            document.querySelectorAll('#provincialSummaryContent .chart-block-custom').forEach(block => {
+                const rect = block.getBoundingClientRect();
+                const isInViewport = (
+                    rect.top >= 0 &&
+                    rect.left >= 0 &&
+                    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+                    rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+                );
+                if (isInViewport) {
+                    block.style.opacity = '1';
+                    block.style.transform = 'translateY(0)';
+                    block.querySelectorAll('.counter').forEach(animateCounter);
+                    block.querySelectorAll('.segment-custom').forEach(segment => {
+                        segment.style.width = '0';
+                        void segment.offsetWidth;
+                        segment.style.setProperty('--width', segment.dataset.width);
+                    });
+                }
+            });
+        };
+
+        // Update the content of the Provincial Summary card
+        function updateProvincialSummaryContent(selectedProvinceName) {
+            console.log(`Attempting to update Provincial Summary Content for: ${selectedProvinceName}`);
+            const provincialSummaryContent = document.getElementById('provincialSummaryContent');
+            const provincialSummaryTitle = document.getElementById('provincialSummaryTitle');
+            const provinceData = provinceDataSummary[selectedProvinceName];
+            const currentProvinceTargets = globalTargets.provinces[selectedProvinceName] || { target_beneficiaries: 0, target_trainings: 0 };
+
+
+            provincialSummaryTitle.textContent = `Provincial Performance Overview for ${selectedProvinceName}`;
+
+            if (!provinceData || selectedProvinceName === 'All' || selectedProvinceName === 'Select Province') {
+                provincialSummaryContent.innerHTML = `<p class="text-gray-500 text-sm text-center">Select a province to view its performance details.</p>`;
+                console.log(`No data or invalid selection for ${selectedProvinceName}. Displaying default message.`);
+                return;
+            }
+
+            console.log(`Data found for ${selectedProvinceName}:`, provinceData);
+
+            const avgTrainingTime = provinceData.training_count_for_avg_time > 0 ?
+                                        (provinceData.total_training_time / provinceData.training_count_for_avg_time) : 0;
+            const avgSuccessRate = provinceData.training_success_rate_count > 0 ? (provinceData.training_success_rate_sum / provinceData.training_success_rate_count) : 0;
+            const avgEngagementRate = provinceData.post_training_engagement_count > 0 ? (provinceData.post_training_engagement_sum / provinceData.post_training_engagement_count) : 0;
+
+            const totalAgeAttendees = Object.values(provinceData.age_groups).reduce((sum, val) => sum + val, 0);
+            const age20_25_pct = totalAgeAttendees > 0 ? (provinceData.age_groups['20-25'] / totalAgeAttendees) * 100 : 0;
+            const age26_35_pct = totalAgeAttendees > 0 ? (provinceData.age_groups['26-35'] / totalAgeAttendees) * 100 : 0;
+            const age36_45_pct = totalAgeAttendees > 0 ? (provinceData.age_groups['36-45'] / totalAgeAttendees) * 100 : 0;
+            const age45_Plus_pct = totalAgeAttendees > 0 ? (provinceData.age_groups['45+'] / totalAgeAttendees) * 100 : 0;
+            
+            const totalCNICs = provinceData.total_attendees_for_fake_cnic;
+            const fakeCNICCount = provinceData.fake_cnics || 0;
+            const validCNICCount = Math.max(0, totalCNICs - fakeCNICCount);
+            const fakeCNICPercentage = totalCNICs > 0 ? ((fakeCNICCount / totalCNICs) * 100) : 0;
+            const validCNICPercentage = (100 - fakeCNICPercentage);
+
+            // Assuming "Handbooks Distributed" could be represented by "Post_Training_Engagement_Pct" for this mock
+            const handbooksDistributedPct = avgEngagementRate; 
+
+            // Inject dynamic HTML content for the provincial summary card
+            provincialSummaryContent.innerHTML = `
+                <div class="chart-block-custom" style="animation-delay: 0.1s;">
+                    <div class="chart-header-custom">
+                        <h3>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 012-2h4a2 2 0 012 2v1m-6.938 4.063A1.063 1.063 0 0112 11a1.063 1.063 0 01-1.063-1.063A1.063 1.063 0 0112 8.875a1.063 1.063 0 011.063 1.063z"></path></svg>
+                            CNIC Verification
+                        </h3>
+                        <div class="value-label-custom"><span class="counter" data-target="${validCNICPercentage.toFixed(0)}">0</span>% Valid</div>
+                    </div>
+                    <div class="bar-wrapper-custom">
+                        <div class="bar-custom">
+                            <div class="segment-custom valid" style="--width: ${validCNICPercentage}%; --delay: 0.5s;" data-tooltip="Valid: ${validCNICCount.toLocaleString()} (${validCNICPercentage.toFixed(1)}%)" data-width="${validCNICPercentage}%"></div>
+                            <div class="segment-custom fake" style="--width: ${fakeCNICPercentage}%; --delay: 0.5s;" data-tooltip="Fake: ${fakeCNICCount.toLocaleString()} (${fakeCNICPercentage.toFixed(1)}%)" data-width="${fakeCNICPercentage}%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-block-custom" style="animation-delay: 0.2s;">
+                    <div class="chart-header-custom">
+                        <h3>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                            Age Demographics
+                        </h3>
+                    </div>
+                    <div class="bar-wrapper-custom">
+                        <div class="bar-custom">
+                            <div class="segment-custom age-1" style="--width: ${age20_25_pct}%; --delay: 0.6s;" data-tooltip="20-25: ${provinceData.age_groups['20-25'].toLocaleString()} (${age20_25_pct.toFixed(1)}%)" data-width="${age20_25_pct}%"></div>
+                            <div class="segment-custom age-2" style="--width: ${age26_35_pct}%; --delay: 0.6s;" data-tooltip="26-35: ${provinceData.age_groups['26-35'].toLocaleString()} (${age26_35_pct.toFixed(1)}%)" data-width="${age26_35_pct}%"></div>
+                            <div class="segment-custom age-3" style="--width: ${age36_45_pct}%; --delay: 0.6s;" data-tooltip="36-45: ${provinceData.age_groups['36-45'].toLocaleString()} (${age36_45_pct.toFixed(1)}%)" data-width="${age36_45_pct}%"></div>
+                            <div class="segment-custom age-4" style="--width: ${age45_Plus_pct}%; --delay: 0.6s;" data-tooltip="45+: ${provinceData.age_groups['45+'].toLocaleString()} (${age45_Plus_pct.toFixed(1)}%)" data-width="${age45_Plus_pct}%"></div>
+                        </div>
+                    </div>
+                    <div class="legend-custom">
+                        <span class="legend-item-custom" style="--color: var(--c-age1)">20-25</span>
+                        <span class="legend-item-custom" style="--color: var(--c-age2)">26-35</span>
+                        <span class="legend-item-custom" style="--color: var(--c-age3)">36-45</span>
+                        <span class="legend-item-custom" style="--color: var(--c-age4)">45+</span>
+                    </div>
+                </div>
+                
+                <div class="chart-block-custom" style="animation-delay: 0.3s;">
+                    <div class="chart-header-custom">
+                        <h3>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
+                            Performance Metrics
+                        </h3>
+                    </div>
+                    <div class="metric-group-custom">
+                        <div class="chart-header-custom" style="margin-bottom: 0.75rem; padding-left: 0.5rem;">
+                            <h4 style="margin:0; font-weight: 500; color: var(--text-secondary);">Avg. Training Time</h4>
+                            <div class="value-label-custom"><span class="counter" data-target="${avgTrainingTime.toFixed(1)}" data-decimals="1">0.0</span> / ${AVERAGE_CLASSROOM_HOURS_PER_DAY.toFixed(1)} hrs</div>
+                        </div>
+                        <div class="bar-wrapper-custom" style="margin-bottom: 1.5rem; margin-left: 0.5rem;">
+                            <div class="bar-custom">
+                                <div class="segment-custom training" style="--width: ${Math.min(100, (avgTrainingTime / AVERAGE_CLASSROOM_HOURS_PER_DAY) * 100)}%; --delay: 0.7s;" data-tooltip="${avgTrainingTime.toFixed(1)} / ${AVERAGE_CLASSROOM_HOURS_PER_DAY.toFixed(1)} hrs" data-width="${Math.min(100, (avgTrainingTime / AVERAGE_CLASSROOM_HOURS_PER_DAY) * 100)}%"></div>
+                            </div>
+                        </div>
+                        <div class="chart-header-custom" style="margin-bottom: 0.75rem; padding-left: 0.5rem;">
+                            <h4 style="margin:0; font-weight: 500; color: var(--text-secondary);">Avg. Engagement Rate</h4>
+                            <div class="value-label-custom"><span class="counter" data-target="${handbooksDistributedPct.toFixed(0)}">0</span>%</div>
+                        </div>
+                        <div class="bar-wrapper-custom" style="margin-left: 0.5rem;">
+                            <div class="bar-custom">
+                                <div class="segment-custom handbooks" style="--width: ${handbooksDistributedPct.toFixed(1)}%; --delay: 0.8s;" data-tooltip="${handbooksDistributedPct.toFixed(1)}% Engagement" data-width="${handbooksDistributedPct.toFixed(1)}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            createAndObserveChartBlocks(); // Trigger animations for newly injected blocks
+            console.log("Provincial Summary Content updated and animations triggered.");
+        }
+
+        // Update the Monthly Trend Chart (using Chart.js)
+        function updateMonthlyTrendChart(filteredData, unit = 'month', metric = 'Beneficiary_Count_Actual') {
+            const dataToUse = (unit === 'day') ? aggregatedDailyTrendData : aggregatedMonthlyTrendData;
+            
+            // Re-filter the pre-aggregated data based on the current main province filter
+            // This re-filtering is necessary because `aggregatedDailyTrendData` and `aggregatedMonthlyTrendData`
+            // are global summaries, not filtered by province.
+            // If the main province filter is "All", then we use the full pre-aggregated data.
+            // If a specific province is selected, we need to sum only the values for that province.
+            
+            let filteredAggregatedData = {};
+            if (document.getElementById('provinceFilter').value === 'All') {
+                 // Clone to avoid modifying the global pre-aggregated data directly
+                 for (const key in dataToUse) {
+                    filteredAggregatedData[key] = dataToUse[key][metric] || 0;
+                 }
+            } else {
+                // If a province is selected, we need to re-aggregate the raw `trainingData` for the chart.
+                const currentFilterValue = document.getElementById('provinceFilter').value;
+                const relevantData = trainingData.filter(item => item.Province === currentFilterValue);
+
+                const allDates = relevantData.map(item => new Date(item.Training_Date));
+                const latestDate = allDates.length > 0 ? new Date(Math.max(...allDates)) : new Date();
+                const eightMonthsAgo = new Date(latestDate);
+                eightMonthsAgo.setMonth(latestDate.getMonth() - 7);
+                eightMonthsAgo.setDate(1);
+
+                relevantData.forEach(item => {
+                    const date = new Date(item.Training_Date);
+                    if (date >= eightMonthsAgo && date <= latestDate) {
+                        let key = (unit === 'day') ? date.toISOString().split('T')[0] : `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-01`;
+                        filteredAggregatedData[key] = (filteredAggregatedData[key] || 0) + (item[metric] || 0);
+                    }
+                });
+
+                // Fill in missing dates for the filtered data as well to ensure continuous lines
+                let currentDateIterator = new Date(eightMonthsAgo);
+                while (currentDateIterator <= latestDate) {
+                    let key;
+                    if (unit === 'day') {
+                        key = currentDateIterator.toISOString().split('T')[0];
+                        currentDateIterator.setDate(currentDateIterator.getDate() + 1);
+                    } else {
+                        key = `${currentDateIterator.getFullYear()}-${(currentDateIterator.getMonth() + 1).toString().padStart(2, '0')}-01`;
+                        currentDateIterator.setMonth(currentDateIterator.getMonth() + 1);
+                    }
+                    if (typeof filteredAggregatedData[key] === 'undefined') {
+                        filteredAggregatedData[key] = 0; // Initialize with 0 if no data for this period
+                    }
+                }
+            }
+
+            const sortedKeys = Object.keys(filteredAggregatedData).sort();
+            const labels = sortedKeys.map(key => new Date(key));
+            const values = sortedKeys.map(key => filteredAggregatedData[key]);
+
+            const targetPerMonth = globalTargets.totalBeneficiaryTarget / 8; // Assuming 8 months target distribution
+            let currentTargetValue = (unit === 'day') ? targetPerMonth / 30.4 : targetPerMonth; // Rough daily average
+
+            monthlyTrendChart.data.labels = labels;
+            monthlyTrendChart.data.datasets[0].data = values.map((val, idx) => ({x: labels[idx], y: val}));
+            monthlyTrendChart.data.datasets[0].label = `Beneficiaries per ${unit}`;
+            monthlyTrendChart.options.scales.x.time.unit = unit;
+            if (monthlyTrendChart.options.plugins.annotation.annotations.targetLine) {
+                monthlyTrendChart.options.plugins.annotation.annotations.targetLine.value = currentTargetValue;
+                monthlyTrendChart.options.plugins.annotation.annotations.targetLine.label.content = `Target: ${currentTargetValue.toFixed(0)}`;
+            }
+            monthlyTrendChart.update();
+        }
+
+        // Update the Provincial Ranking table
+        function updateProvincialRanking() {
+            const activeSortButton = document.querySelector('.provincial-ranking-card .flex.gap-2 .chart-filter-button.active');
+            const sortMetric = activeSortButton ? activeSortButton.dataset.sortMetric : 'beneficiaries';
+
+            let sortedProvinces;
+            // Use the pre-processed data and sort it
+            if (sortMetric === 'beneficiaries') {
+                sortedProvinces = [...provincialRankingsData].sort((a, b) => b.beneficiaries - a.beneficiaries);
+            } else if (sortMetric === 'trainings') {
+                sortedProvinces = [...provincialRankingsData].sort((a, b) => b.trainings - a.trainings);
+            } else if (sortMetric === 'target_achievement') {
+                sortedProvinces = [...provincialRankingsData].sort((a, b) => b.beneficiary_target_pct - a.beneficiary_target_pct);
+            }
+
+
+            const tableBody = document.getElementById('provincialRankingTableBody');
+            tableBody.innerHTML = ''; // Clear existing rows
+            if (sortedProvinces.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="5" class="px-4 py-2 text-center text-gray-500">No provincial data.</td></tr>`;
+            } else {
+                sortedProvinces.forEach((item, index) => {
+                    const targetPercentColor = item.beneficiary_target_pct >= 100 ? 'bg-green-500' : (item.beneficiary_target_pct >= 75 ? 'bg-yellow-500' : 'bg-red-500');
+                    tableBody.innerHTML += `
+                        <tr class="border-b border-gray-200">
+                            <td class="px-4 py-2 font-medium text-gray-800">${index + 1}</td>
+                            <td class="px-4 py-2 text-gray-700">${item.province}</td>
+                            <td class="px-4 py-2 text-gray-700">${item.beneficiaries.toLocaleString()}</td>
+                            <td class="px-4 py-2 text-gray-700">${item.trainings.toLocaleString()}</td>
+                            <td class="px-4 py-2 text-gray-700">
+                                <div class="w-full bg-gray-300 rounded-full h-2.5">
+                                    <div class="${targetPercentColor} h-2.5 rounded-full" style="width: ${Math.min(100, item.beneficiary_target_pct)}%"></div>
+                                </div>
+                                <span class="text-xs text-gray-600">${item.beneficiary_target_pct.toFixed(1)}%</span>
+                            </td>
+                        </tr>`;
+                });
+            }
+        }
+
+        // Update the Top Trainers Leaderboard
+        function updateLeaderboard() {
+            // Leaderboard data is already pre-sorted and sliced to top 5 in `preProcessAllData`
+            const sortedTrainers = leaderboardData; 
+
+            const tableBody = document.getElementById('leaderboardTableBody');
+            tableBody.innerHTML = ''; // Clear existing rows
+            if (sortedTrainers.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="3" class="px-4 py-2 text-center text-gray-500">No trainer data this month.</td></tr>`;
+            } else {
+                sortedTrainers.forEach((item, index) => {
+                    const targetPercentColor = item.target_pct >= 100 ? 'bg-green-500' : (item.target_pct >= 75 ? 'bg-yellow-500' : 'bg-red-500');
+                    tableBody.innerHTML += `
+                        <tr class="border-b border-gray-200">
+                            <td class="px-4 py-2 font-medium text-gray-800">${index + 1}</td>
+                            <td class="px-4 py-2 text-gray-700">${item.name}</td>
+                            <td class="px-4 py-2 text-gray-700">${item.beneficiaries.toLocaleString()}</td>
+                            <td class="px-4 py-2 text-gray-700">
+                                <div class="w-full bg-gray-300 rounded-full h-2.5">
+                                    <div class="${targetPercentColor} h-2.5 rounded-full" style="width: ${item.target_pct}%"></div>
+                                </div>
+                                <span class="text-xs text-gray-600">${item.target_pct}%</span>
+                            </td>
+                        </tr>`;
+                });
+            }
+        }
+
+        // Update the Operational Alerts section
+        function updateAlerts() {
+            const alertsList = document.querySelector('.leaflet-control-alerts-overlay #alertsList');
+            const alertsOverlayDiv = document.querySelector('.leaflet-control-alerts-overlay');
+
+            // Small delay to ensure the DOM element is rendered if called very early
+            if (!alertsList || !alertsOverlayDiv) {
+                setTimeout(() => updateAlerts(), 100);
+                return;
+            }
+
+            alertsList.innerHTML = ''; // Clear existing alerts
+            
+            if (systemAlerts.length === 0) {
+                alertsList.innerHTML = `<li class="p-2 text-center text-gray-500">No system alerts.</li>`;
+                alertsOverlayDiv.style.display = 'none'; // Hide overlay if no alerts
+            } else {
+                systemAlerts.forEach(alert => {
+                    alertsList.innerHTML += `<li class="${alert.className}">${alert.message}</li>`;
+                });
+                alertsOverlayDiv.style.display = 'flex'; // Show overlay if alerts exist
+            }
+        }
+    </script>
+</body>
+</html>

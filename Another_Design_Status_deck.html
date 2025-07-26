@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DFLT Phase 2 - Project Dashboard</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet"/>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body {
+            background-color: #f0f2f5;
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .chart-container { position: relative; height: 100%; width: 100%; min-height: 250px; }
+        .table-container { flex-grow: 1; overflow-y: auto; }
+        .table-container::-webkit-scrollbar, .scrollable::-webkit-scrollbar { width: 4px; }
+        .table-container::-webkit-scrollbar-track, .scrollable::-webkit-scrollbar-track { background: transparent; }
+        .table-container::-webkit-scrollbar-thumb, .scrollable::-webkit-scrollbar-thumb { background-color: #d1d5db; border-radius: 10px; }
+        
+        .kpi-card { transition: all 0.3s ease; }
+        .kpi-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        /* Trainer Deck - Calendar Heatmap Styles */
+        .calendar-grid {
+            display: grid;
+            grid-template-rows: repeat(7, 1fr);
+            grid-auto-flow: column;
+            gap: 3px;
+        }
+        .calendar-day {
+            width: 12px;
+            height: 12px;
+            background-color: #ebedf0;
+            border-radius: 2px;
+            transition: background-color 0.3s ease;
+        }
+        .calendar-day[data-level='1'] { background-color: #9be9a8; }
+        .calendar-day[data-level='2'] { background-color: #40c463; }
+        .calendar-day[data-level='3'] { background-color: #30a14e; }
+        .calendar-day[data-level='4'] { background-color: #216e39; }
+        
+        /* Trainer Deck - Timeline Styles */
+        .timeline .timeline-item {
+            position: relative;
+            padding-left: 2rem;
+            padding-bottom: 1.5rem;
+            border-left: 2px solid #e5e7eb;
+        }
+        .timeline .timeline-item:last-child { border-left-color: transparent; }
+        .timeline .timeline-icon {
+            position: absolute;
+            left: -0.6rem;
+            top: 0;
+            width: 1.1rem;
+            height: 1.1rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body x-data="{ 
+    activeDeck: 'status',
+    pageTitle: 'Status Deck',
+    updateTitle(deck, title) {
+        this.activeDeck = deck;
+        this.pageTitle = title;
+    }
+}">
+
+    <div class="flex h-screen bg-gray-100">
+        <aside class="w-64 bg-gray-800 text-white flex-col shadow-lg flex-shrink-0">
+            <div class="flex items-center justify-center h-16 border-b border-gray-700">
+                <i class="ri-dashboard-3-line text-2xl text-indigo-400"></i>
+                <h1 class="text-xl font-bold ml-2">DFLT DASH</h1>
+            </div>
+            <nav class="flex-1 px-4 py-6 space-y-2">
+                <a @click="updateTitle('status', 'Status Deck')" href="#" :class="{ 'bg-gray-700': activeDeck === 'status' }" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                    <i class="ri-bar-chart-box-line w-6 text-center text-lg"></i><span class="ml-4">Status Deck</span>
+                </a>
+                <a @click="updateTitle('ic', 'IC Deck')" href="#" :class="{ 'bg-gray-700': activeDeck === 'ic' }" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                    <i class="ri-group-2-line w-6 text-center text-lg"></i><span class="ml-4">IC Deck</span>
+                </a>
+                <a @click="updateTitle('trainer', 'Trainer Deck')" href="#" :class="{ 'bg-gray-700': activeDeck === 'trainer' }" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                   <i class="ri-user-star-line w-6 text-center text-lg"></i><span class="ml-4">Trainer Deck</span>
+                </a>
+                 <a @click="updateTitle('qa', 'QA & M&E Deck')" href="#" :class="{ 'bg-gray-700': activeDeck === 'qa' }" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                    <i class="ri-checkbox-multiple-line w-6 text-center text-lg"></i><span class="ml-4">QA & M&E Deck</span>
+                </a>
+                 <a @click="updateTitle('review', 'Recording Review')" href="#" :class="{ 'bg-gray-700': activeDeck === 'review' }" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                    <i class="ri-mic-line w-6 text-center text-lg"></i><span class="ml-4">Recording Review</span>
+                </a>
+            </nav>
+        </aside>
+
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <header class="bg-white shadow-sm h-16 flex items-center justify-between px-6 z-10 flex-shrink-0">
+                <div class="flex items-center">
+                    <h2 class="text-2xl font-semibold text-gray-800" x-text="pageTitle"></h2>
+                    <div x-show="activeDeck === 'trainer'" class="ml-8">
+                         <select id="trainer-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
+                            <option selected>Select a Trainer...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-600" id="current-time"></span>
+                    <i class="ri-notification-3-line text-xl text-gray-500 cursor-pointer"></i>
+                </div>
+            </header>
+
+            <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">
+                
+                <div x-show="activeDeck === 'status'" class="fade-in space-y-6">
+                    </div>
+
+                <div x-show="activeDeck === 'ic'" class="fade-in space-y-6">
+                    </div>
+                
+                <div x-show="activeDeck === 'trainer'" id="trainer-deck-content" class="fade-in hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-1 space-y-6">
+                            <div class="bg-white p-6 rounded-lg shadow-sm text-center">
+                                <img id="trainer-avatar" src="https://i.pravatar.cc/150?u=a042581f4e29026704d" alt="Trainer Avatar" class="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-gray-200">
+                                <h3 id="trainer-name" class="text-xl font-bold text-gray-800">Select a Trainer</h3>
+                                <p id="trainer-id" class="text-sm text-gray-500">TRN-000</p>
+                                <p id="trainer-ic" class="text-sm text-gray-500 mt-1">IC: N/A</p>
+                                <div id="trainer-status" class="mt-4 inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold">Inactive</div>
+                            </div>
+                             <div class="bg-white p-6 rounded-lg shadow-sm">
+                                <h3 class="font-semibold text-gray-800 mb-4">Skill Assessment (Self vs. QA)</h3>
+                                <div class="chart-container min-h-[280px]">
+                                    <canvas id="trainer-radar-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-2 space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div class="bg-white p-5 rounded-lg shadow-sm">
+                                    <p class="text-sm font-medium text-gray-500">Monthly Target</p>
+                                    <p class="text-3xl font-bold text-indigo-600"><span id="trainer-kpi-achieved">0</span>/<span id="trainer-kpi-target">0</span></p>
+                                    <p id="trainer-kpi-percentage" class="text-xs text-gray-400">0% achieved</p>
+                                </div>
+                                <div class="bg-white p-5 rounded-lg shadow-sm">
+                                    <p class="text-sm font-medium text-gray-500">Avg. QA Score</p>
+                                    <p class="text-3xl font-bold text-gray-800" id="trainer-kpi-qa-score">0</p>
+                                    <p class="text-xs text-gray-400">From all reviews</p>
+                                </div>
+                                <div class="bg-white p-5 rounded-lg shadow-sm">
+                                    <p class="text-sm font-medium text-gray-500">Total Sessions</p>
+                                    <p class="text-3xl font-bold text-gray-800" id="trainer-kpi-sessions">0</p>
+                                    <p class="text-xs text-gray-400">In last 6 months</p>
+                                </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-lg shadow-sm">
+                                <h3 class="font-semibold text-gray-800 mb-4">Activity (Last Year)</h3>
+                                <div id="trainer-activity-calendar" class="calendar-grid">
+                                    </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-lg shadow-sm">
+                                <h3 class="font-semibold text-gray-800 mb-4">Recent Sessions & Alerts</h3>
+                                <div id="trainer-sessions-log" class="timeline max-h-96 overflow-y-auto scrollable pr-2">
+                                   <p class="text-center text-gray-500">Select a trainer to see their activity.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div x-show="activeDeck === 'qa'" class="fade-in"><div class="bg-white p-6 rounded-lg shadow-sm">QA & M&E Deck Content Goes Here</div></div>
+                <div x-show="activeDeck === 'review'" class="fade-in"><div class="bg-white p-6 rounded-lg shadow-sm">Recording Review Deck Content Goes Here</div></div>
+            </main>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let fullData = {};
+    let statusMap, icMap, trainerRadarChart;
+
+    function initialize() {
+        updateTime();
+        setInterval(updateTime, 1000 * 60);
+
+        statusMap = initializeMap('status-map');
+        icMap = initializeMap('ic-map');
+        
+        document.getElementById('trainer-select').addEventListener('change', (e) => {
+            displayTrainerData(e.target.value, fullData.trainer_deck_data);
+        });
+
+        loadDashboardData();
+    }
+
+    // ... (updateTime and initializeMap functions are the same as before) ...
+    function updateTime() {
+        document.getElementById('current-time').textContent = new Date().toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+    function initializeMap(elementId) {
+        if (!document.getElementById(elementId)) return null;
+        const map = L.map(elementId, { zoomControl: false }).setView([30.3753, 69.3451], 5);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>' }).addTo(map);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+        return map;
+    }
+
+
+    async function loadDashboardData() {
+        try {
+            const response = await fetch('./dflt_dashboard_data.json');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            fullData = await response.json();
+            
+            // NOTE: Status and IC deck population functions are removed for brevity, but would be here.
+            // populateStatusDeck(fullData.status_deck_data); 
+            // populateIcDeck(fullData.ic_deck_data, fullData.status_deck_data.map_data);
+            populateTrainerDeck(fullData.trainer_deck_data);
+        } catch (error) {
+            console.error("Fatal Error: Could not load or parse dflt_dashboard_data.json.", error);
+            alert("Could not load dashboard data.");
+        }
+    }
+
+    function populateTrainerDeck(data) {
+        if (!data || !data.profiles) return;
+        const select = document.getElementById('trainer-select');
+        select.innerHTML = '<option value="">Select a Trainer...</option>';
+        Object.values(data.profiles).forEach(profile => {
+            const option = document.createElement('option');
+            option.value = profile.name;
+            option.textContent = profile.name;
+            select.appendChild(option);
+        });
+    }
+    
+    function displayTrainerData(trainerName, data) {
+        const contentEl = document.getElementById('trainer-deck-content');
+        if (!trainerName) {
+            contentEl.classList.add('hidden');
+            return;
+        }
+        contentEl.classList.remove('hidden');
+
+        const profile = data.profiles[trainerName];
+        const trainerData = data.all_trainers_data[trainerName];
+
+        // 1. Populate Profile Card
+        document.getElementById('trainer-name').textContent = profile.name;
+        document.getElementById('trainer-id').textContent = profile.id;
+        document.getElementById('trainer-ic').textContent = `IC: ${profile.ic}`;
+        const statusEl = document.getElementById('trainer-status');
+        statusEl.textContent = profile.status;
+        statusEl.className = 'mt-4 inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ';
+        statusEl.classList.add({
+            'Active': 'bg-green-100 text-green-800',
+            'On Watch': 'bg-yellow-100 text-yellow-800',
+            'Inactive': 'bg-red-100 text-red-800'
+        }[profile.status] || 'bg-gray-100 text-gray-800');
+
+        // 2. Populate KPI cards
+        const targetData = trainerData.monthly_target_achievement;
+        document.getElementById('trainer-kpi-achieved').textContent = targetData.achieved;
+        document.getElementById('trainer-kpi-target').textContent = targetData.target;
+        document.getElementById('trainer-kpi-percentage').textContent = `${targetData.percentage}% achieved`;
+        
+        const qaScores = trainerData.skill_assessment.qa;
+        const avgQaScore = qaScores.reduce((a, b) => a + b, 0) / (qaScores.length || 1);
+        document.getElementById('trainer-kpi-qa-score').textContent = (avgQaScore / 10).toFixed(1); // Assuming score is out of 100, show as out of 10
+        document.getElementById('trainer-kpi-sessions').textContent = trainerData.activity_calendar.dates_with_activity.length;
+
+        // 3. Create/Update Radar Chart
+        const radarCtx = document.getElementById('trainer-radar-chart').getContext('2d');
+        if (trainerRadarChart) {
+            trainerRadarChart.destroy();
+        }
+        trainerRadarChart = new Chart(radarCtx, {
+            type: 'radar',
+            data: {
+                labels: trainerData.skill_assessment.labels,
+                datasets: [
+                    {
+                        label: 'Self Assessment',
+                        data: trainerData.skill_assessment.self,
+                        backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                        borderColor: 'rgba(79, 70, 229, 1)',
+                        pointBackgroundColor: 'rgba(79, 70, 229, 1)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(79, 70, 229, 1)',
+                    },
+                    {
+                        label: 'QA Assessment',
+                        data: trainerData.skill_assessment.qa,
+                        backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        pointBackgroundColor: 'rgba(34, 197, 94, 1)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(34, 197, 94, 1)',
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top' } },
+                scales: {
+                    r: {
+                        angleLines: { color: '#e5e7eb' },
+                        grid: { color: '#e5e7eb' },
+                        pointLabels: { font: { size: 12 } },
+                        ticks: { backdropColor: 'transparent', stepSize: 20 },
+                        suggestedMin: 0,
+                        suggestedMax: 100
+                    }
+                }
+            }
+        });
+
+        // 4. Generate Activity Calendar
+        const calendarEl = document.getElementById('trainer-activity-calendar');
+        calendarEl.innerHTML = '';
+        const activityDates = new Set(trainerData.activity_calendar.dates_with_activity);
+        const today = new Date();
+        const oneYearAgo = new Date(new Date().setFullYear(today.getFullYear() - 1));
+        
+        for (let d = oneYearAgo; d <= today; d.setDate(d.getDate() + 1)) {
+            const dayEl = document.createElement('div');
+            dayEl.className = 'calendar-day';
+            const dateString = d.toISOString().split('T')[0];
+            if (activityDates.has(dateString)) {
+                dayEl.dataset.level = '2'; // Simple level for now
+                dayEl.title = `Activity on ${dateString}`;
+            }
+            calendarEl.appendChild(dayEl);
+        }
+
+        // 5. Populate Sessions Log
+        const logEl = document.getElementById('trainer-sessions-log');
+        logEl.innerHTML = '';
+        if (trainerData.recent_sessions_log.length === 0) {
+            logEl.innerHTML = '<p class="text-center text-gray-500">No recent sessions found.</p>';
+            return;
+        }
+        trainerData.recent_sessions_log.forEach(log => {
+            const item = document.createElement('div');
+            item.className = 'timeline-item';
+            
+            let alertIcon = '';
+            if (log.Alert) {
+                alertIcon = `<i class="ri-error-warning-fill text-yellow-500" title="${log.Alert.message}"></i>`;
+            } else if (log.Audio) {
+                 alertIcon = `<i class="ri-headphone-fill text-blue-500" title="Audio available"></i>`;
+            }
+
+            item.innerHTML = `
+                <div class="timeline-icon bg-gray-200 text-gray-600">
+                    <i class="ri-calendar-check-line"></i>
+                </div>
+                <div class="flex justify-between items-center">
+                    <p class="text-sm font-semibold text-gray-800">${log.District} - ${log.Beneficiaries} Beneficiaries</p>
+                    <span class="text-xs text-gray-400">${log.Date}</span>
+                </div>
+                <p class="text-xs text-gray-600 mt-1">Session ID: ${log.ID}</p>
+                <div class="flex items-center gap-4 mt-2 text-xs">
+                    <span><i class="ri-bank-card-line text-green-500"></i> Accounts: ${log.Accounts}</span>
+                    <span><i class="ri-star-line text-yellow-500"></i> QA Score: ${log.QA}/10</span>
+                    ${alertIcon}
+                </div>
+            `;
+            logEl.appendChild(item);
+        });
+    }
+
+    initialize();
+});
+</script>
+
+</body>
+</html>

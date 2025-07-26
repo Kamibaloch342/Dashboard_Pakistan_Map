@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DFLT Phase 2 Data Model</title>
+    <!-- Google Fonts - Montserrat -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif; /* Montserrat font */
+            background-color: #f0f4f8; /* Light blue-gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem;
+            box-sizing: border-box;
+        }
+        .container {
+            display: grid;
+            gap: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Responsive grid */
+            max-width: 1200px;
+            width: 100%;
+        }
+        .table-box {
+            background-color: #ffffff;
+            border-radius: 1rem; /* More rounded corners */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); /* Stronger shadow */
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #e2e8f0; /* Light border */
+        }
+        .table-title {
+            font-size: 1.5rem; /* Larger title */
+            font-weight: 700; /* Bold */
+            color: #2c5282; /* Darker blue for titles */
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #a7d9f7; /* Underline effect */
+        }
+        .column-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .column-item {
+            padding: 0.4rem 0;
+            font-size: 0.95rem;
+            color: #4a5568; /* Gray text */
+            border-bottom: 1px dashed #edf2f7; /* Dashed separator */
+            display: flex; /* Use flex for icon/text alignment */
+            align-items: center;
+        }
+        .column-item:last-child {
+            border-bottom: none; /* No border for last item */
+        }
+        .pk {
+            font-weight: 700; /* Bold for PK */
+            color: #805ad5; /* Purple for PK */
+        }
+        .fk {
+            font-weight: 700; /* Bold for FK */
+            color: #d53f8c; /* Pink for FK */
+        }
+        .fk::before {
+            content: '🔗 '; /* Link icon for FKs */
+            font-size: 0.8em;
+            margin-right: 0.25rem;
+            color: #d53f8c;
+        }
+        .pk::before {
+            content: '🔑 '; /* Key icon for PKs */
+            font-size: 0.8em;
+            margin-right: 0.25rem;
+            color: #805ad5;
+        }
+        .note {
+            font-size: 0.8rem;
+            color: #718096;
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid #e2e8f0;
+        }
+        .highlight-text {
+            color: #3182ce; /* Blue for highlighted text */
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- 1. Trainings Table (Central Hub) -->
+        <div class="table-box col-span-full md:col-span-2 lg:col-span-3 xl:col-span-5">
+            <h2 class="table-title">1. Trainings <span class="text-sm font-normal text-gray-500">(Central Hub)</span></h2>
+            <ul class="column-list">
+                <li class="column-item pk">training_session_id (PK)</li>
+                <li class="column-item">trainer_name</li>
+                <li class="column-item">training_day</li>
+                <li class="column-item">training_date</li>
+                <li class="column-item">training_start_time</li>
+                <li class="column-item">training_end_time</li>
+                <li class="column-item">language_of_training (Array/List)</li>
+                <li class="column-item">beneficiaries_count_reported_by_trainer</li>
+                <li class="column-item">ic_contacted_trainer (Boolean)</li>
+                <li class="column-item">mode_of_contact</li>
+                <li class="column-item">ic_questions_feedback</li>
+                <li class="column-item">trainer_issue_ic</li>
+                <li class="column-item">trainer_issue_beneficiaries</li>
+                <li class="column-item">describe_issue_query</li>
+                <li class="column-item">topics_covered_session (Array/List)</li>
+                <li class="column-item highlight-text">training_location_latitude (Map Coord)</li>
+                <li class="column-item highlight-text">training_location_longitude (Map Coord)</li>
+                <li class="column-item">training_audio_recording_url</li>
+                <li class="column-item">created_at</li>
+            </ul>
+            <p class="note">This table generates the unique `training_session_id` which acts as the central link for all related data across the project.</p>
+        </div>
+
+        <!-- 2. Beneficiaries Table -->
+        <div class="table-box">
+            <h2 class="table-title">2. Beneficiaries</h2>
+            <ul class="column-list">
+                <li class="column-item pk">beneficiary_id (PK)</li>
+                <li class="column-item fk">training_session_id (FK: Links to Trainings.training_session_id)</li>
+                <li class="column-item">full_name</li>
+                <li class="column-item">cnic_number</li>
+                <li class="column-item">cnic_front_picture_url</li>
+                <li class="column-item">cnic_back_picture_url</li>
+                <li class="column-item">cell_phone_number</li>
+                <li class="column-item">whatsapp_number</li>
+                <li class="column-item">address</li>
+                <li class="column-item">union_council</li>
+                <li class="column-item">tehsil</li>
+                <li class="column-item">districts</li>
+                <li class="column-item">educational_level</li>
+                <li class="column-item">age</li>
+                <li class="column-item">occupation</li>
+                <li class="column-item">mobile_money_account_available (Boolean)</li>
+                <li class="column-item">household_income_monthly</li>
+                <li class="column-item">household_members_count</li>
+                <li class="column-item">school_going_children</li>
+                <li class="column-item">adults_count</li>
+                <li class="column-item">own_cell_phone (Boolean)</li>
+                <li class="column-item">access_cell_phone (Boolean)</li>
+                <li class="column-item">phone_sim_owner</li>
+                <li class="column-item">whatsapp_owner</li>
+                <li class="column-item">have_mob_money_account (Boolean)</li>
+                <li class="column-item">own_bank_account (Boolean)</li>
+                <li class="column-item">avg_savings_money</li>
+                <li class="column-item">taken_loan_6months (Boolean)</li>
+                <li class="column-item">loan_amount</li>
+                <li class="column-item">loan_source</li>
+                <li class="column-item">climate_change_affecting_community</li>
+                <li class="column-item">created_at</li>
+            </ul>
+        </div>
+
+        <!-- 3. IC_Reports Table -->
+        <div class="table-box">
+            <h2 class="table-title">3. IC_Reports</h2>
+            <ul class="column-list">
+                <li class="column-item pk">ic_report_id (PK)</li>
+                <li class="column-item fk">training_session_id_monitored (FK: Links to Trainings.training_session_id)</li>
+                <li class="column-item">ic_name</li>
+                <li class="column-item">training_day_monitored</li>
+                <li class="column-item">monitoring_date</li>
+                <li class="column-item">trainer_monitored_name</li>
+                <li class="column-item">mode_of_monitoring</li>
+                <li class="column-item">questions_asked_trainer</li>
+                <li class="column-item">trainer_performance_rating</li>
+                <li class="column-item">topics_covered_by_trainer_observed</li>
+                <li class="column-item">faced_query_issue</li>
+                <li class="column-item">query_issue_other</li>
+                <li class="column-item">pc_contacted_ic (Boolean)</li>
+                <li class="column-item highlight-text">ic_location_latitude (Map Coord)</li>
+                <li class="column-item highlight-text">ic_location_longitude (Map Coord)</li>
+                <li class="column-item">created_at</li>
+            </ul>
+        </div>
+
+        <!-- 4. QA_Reports Table -->
+        <div class="table-box">
+            <h2 class="table-title">4. QA_Reports</h2>
+            <ul class="column-list">
+                <li class="column-item pk">qa_report_id (PK)</li>
+                <li class="column-item">observer_name</li>
+                <li class="column-item">trainer_name_observed</li>
+                <li class="column-item">training_date_observed</li>
+                <li class="column-item">province</li>
+                <li class="column-item">tehsil_district</li>
+                <li class="column-item">place</li>
+                <li class="column-item">concepts_covered_during_training_qa (Array/List)</li>
+                <li class="column-item">observations_notes_qa</li>
+                <li class="column-item highlight-text">qa_monitoring_location_latitude (Map Coord)</li>
+                <li class="column-item highlight-text">qa_monitoring_location_longitude (Map Coord)</li>
+                <li class="column-item">created_at</li>
+            </ul>
+            <p class="note">This form captures direct observation data. While it includes 'trainer_name_observed', the primary linkage for detailed analysis would be through the 'Trainings' table based on date and location if a direct 'Training Session ID' isn't captured.</p>
+        </div>
+
+        <!-- 5. Recording_Reviews Table -->
+        <div class="table-box">
+            <h2 class="table-title">5. Recording_Reviews</h2>
+            <ul class="column-list">
+                <li class="column-item pk">review_id (PK)</li>
+                <li class="column-item fk">training_session_id_reviewed (FK: Links to Trainings.training_session_id)</li>
+                <li class="column-item">reviewer_name</li>
+                <li class="column-item">trainer_name_reviewed</li>
+                <li class="column-item">training_date_reviewed</li>
+                <li class="column-item">audio_recording_quality_rating</li>
+                <li class="column-item">trainer_performance_audio_engagement</li>
+                <li class="column-item">trainer_performance_audio_clarity</li>
+                <li class="column-item">trainer_performance_audio_adherence</li>
+                <li class="column-item">trainer_performance_audio_overall</li>
+                <li class="column-item">concepts_covered_from_recording (Array/List)</li>
+                <li class="column-item">key_observations_feedback</li>
+                <li class="column-item">recommendations_for_trainer</li>
+                <li class="column-item">created_at</li>
+            </ul>
+        </div>
+
+    </div>
+</body>
+</html>

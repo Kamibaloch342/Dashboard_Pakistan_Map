@@ -1,0 +1,3922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DFLT Phase 2 Dashboard</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* Custom CSS Variables for easy theme management */
+        :root {
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --border-color: #dee2e6;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --bar-bg: #e9ecef;
+            
+            /* Custom colors for bar segments */
+            --c-valid: #28a745;
+            --c-fake: #ffc107;
+            --c-age1: #0d6efd;
+            --c-age2: #6f42c1;
+            --c-age3: #17a2b8;
+            --c-age4: #6c757d;
+            --c-training: #0d6efd;
+            --c-handbooks: #20c997;
+        }
+
+        /* Base styles for body and font */
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--bg-color);
+            background-image: linear-gradient(175deg, #f8f9fa 0%, #e9ecef 100%);
+            color: var(--text-primary);
+            overflow: hidden; /* Prevent scrollbars from showing due to initial animations */
+        }
+
+        /* Main dashboard grid layout using CSS Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-template-rows: 60px repeat(10, minmax(0, 1fr)); /* Header + 10 rows for content */
+            gap: 1rem;
+            height: 100vh; /* Full viewport height */
+            padding: 1rem;
+            box-sizing: border-box; /* Include padding in element's total width and height */
+        }
+
+        /* Styling for all dashboard cards with animations and shadows */
+        .card {
+            background-color: rgba(255, 255, 255, 0.9); /* Slightly transparent background */
+            backdrop-filter: blur(10px); /* Frosted glass effect */
+            border-radius: 0.75rem;
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.5s ease-out forwards; /* Fade-in animation */
+            color: var(--text-primary);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* Soft shadow */
+            min-height: 0; /* Allow cards to shrink as needed */
+        }
+
+        /* Ensure Montserrat font and correct text color for all relevant elements */
+        h1, h2, h3, h4, p, span, div, label, select, button, table, th, td {
+            font-family: 'Montserrat', sans-serif !important;
+            color: var(--text-primary);
+        }
+        /* Specific color overrides for Tailwind classes to ensure light mode compatibility */
+        .text-white { color: var(--text-primary) !important; }
+        .text-gray-400 { color: var(--text-secondary) !important; }
+        .text-gray-200 { color: #374151 !important; }
+        .text-gray-300 { color: #4b5563 !important; }
+        .text-gray-500 { color: var(--text-secondary) !important; }
+        .text-red-400 { color: #ef4444 !important; }
+        .text-yellow-400 { color: #facc15 !important; }
+        .text-indigo-400 { color: #6366f1 !important; }
+        .text-teal-400 { color: #2dd4bf !important; }
+        .text-indigo-300 { color: #818cf8 !important; }
+
+
+        /* Keyframe animation for general fade-in effect */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Grid placement for main sections */
+        .header {
+            grid-column: 1 / -1; /* Spans all columns */
+            grid-row: 1; /* First row */
+            background-color: var(--card-bg);
+        }
+        .map-card {
+            grid-column: 1 / 8; /* Spans 7 columns */
+            grid-row: 2 / 8; /* Spans rows 2 to 7 */
+            position: relative;
+        }
+        .kpi-main {
+            grid-column: 8 / 13; /* Spans 5 columns */
+            grid-row: 2 / 4; /* Spans rows 2 to 3 */
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* 3 columns for KPIs */
+            gap: 1rem;
+            background-color: transparent; /* Remove background for this container */
+            border: none;
+            box-shadow: none;
+            padding: 0;
+        }
+        .kpi-main .card {
+            background-color: rgba(255, 255, 255, 0.9); /* Individual KPI cards retain background */
+            justify-content: center;
+        }
+
+        .provincial-summary-card {
+            grid-column: 1 / 8; /* Spans 7 columns */
+            grid-row: 8 / 12; /* Spans rows 8 to 11 */
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            overflow-y: hidden; /* Hide scrollbar for the entire card, its content will scroll */
+        }
+        /* Specific content area within provincial summary card for scrolling */
+        #provincialSummaryContent {
+            flex-grow: 1;
+            overflow-y: auto; /* Enable scrolling for content */
+        }
+
+
+        .monthly-trend-card {
+            grid-column: 8 / 13; /* Spans 5 columns */
+            grid-row: 4 / 8; /* Spans rows 4 to 7 */
+        }
+        .provincial-ranking-card {
+            grid-column: 8 / 13; /* Spans 5 columns */
+            grid-row: 8 / 12;
+        }
+        .leaderboard-card {
+            grid-column: 9 / 13; /* Spans 4 columns */
+            grid-row: 8 / 12;
+            display: none; /* Hidden by default, will be controlled by a button */
+        }
+
+        /* Leaflet map styling */
+        #map {
+            height: 100%;
+            width: 100%;
+            border-radius: 0.5rem;
+            z-index: 0; /* Ensure map is behind other elements */
+        }
+        /* Light mode popups for Leaflet */
+        .leaflet-popup-content-wrapper {
+            background-color: #fff;
+            color: #1f2937;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            font-family: 'Montserrat', sans-serif !important;
+        }
+        .leaflet-popup-tip { background-color: #fff; }
+        .leaflet-popup-content-wrapper * { font-family: 'Montserrat', sans-serif !important; color: #1f2937; }
+
+        /* Chart.js specific styling (for monthly trend) */
+        .chart-container {
+            flex-grow: 1; /* Allow chart to take available space */
+            position: relative;
+            min-height: 0; /* Prevent flex item from overflowing */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Table container for scrolling content within cards */
+        .table-container {
+            flex-grow: 1;
+            overflow-y: auto; /* Enable scrolling for table content */
+            min-height: 0;
+        }
+        /* Custom scrollbar styling for better aesthetics */
+        .table-container::-webkit-scrollbar { width: 6px; }
+        .table-container::-webkit-scrollbar-track { background: transparent; }
+        .table-container::-webkit-scrollbar-thumb { background-color: #d1d5db; border-radius: 10px; }
+        .table-container thead {
+            background-color: #e5e7eb;
+            position: sticky; /* Keep header visible on scroll */
+            top: 0;
+            z-index: 1;
+        }
+
+        /* Provincial Summary Card Specific Styles (for Chart.js based graphs) */
+        .province-metric-item {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            background-color: rgba(243, 244, 246, 0.5); /* Light background for metric items */
+            border: 1px solid #f3f4f6;
+            height: 100%;
+            min-height: 120px;
+        }
+        .province-metric-item .chart-container {
+            flex-grow: 1;
+            width: 100%;
+            min-height: 80px;
+        }
+        .province-metric-item canvas {
+            max-height: 100%;
+            max-width: 100%;
+        }
+
+
+        /* Province filter buttons styling (removed from HTML) */
+        .province-button {
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            background-color: #d1d5db;
+            color: #374151;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid #cbd5e1;
+            transition: all 0.2s ease-in-out;
+        }
+        .province-button:hover {
+            background-color: #e5e7eb;
+            transform: translateY(-2px);
+        }
+        .province-button.active {
+            background-color: #4f46e5;
+            border-color: #6366f1;
+            color: white;
+            box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3);
+        }
+
+        /* Custom marker icon styling for map */
+        .leaflet-div-icon {
+            background: none !important;
+            border: none !important;
+        }
+        .location-dot {
+            border-radius: 50%;
+            background-color: #4f46e5;
+            box-shadow: 0 0 8px rgba(79, 70, 229, 0.6);
+            transition: all 0.1s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid white;
+        }
+        .location-dot-pulse {
+            animation: dot-pulse 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+            position: absolute;
+            border-radius: 50%;
+            background-color: #4f46e5;
+            opacity: 0.2;
+        }
+        @keyframes dot-pulse {
+            0% { transform: scale(0.5); opacity: 0.8; }
+            100% { transform: scale(1.2); opacity: 0; }
+        }
+
+        /* Meter Chart (Gauge) Styles (no longer explicitly used in JS, but might be part of Chart.js elements) */
+        .gauge-container {
+            width: 100%;
+            max-width: 150px;
+            height: 100px;
+            margin: 0 auto;
+            position: relative;
+            overflow: hidden;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .gauge-container svg {
+            width: 100%;
+            height: auto;
+        }
+        .gauge-arc {
+            fill: none;
+            stroke: #e5e7eb;
+            stroke-width: 10;
+        }
+        .gauge-value-arc {
+            fill: none;
+            stroke: #4f46e5;
+            stroke-width: 10;
+            stroke-linecap: round;
+            transition: stroke-dasharray .5s ease-in-out;
+        }
+        .gauge-text {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .gauge-label {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+
+        /* Alerts overlay on map */
+        .leaflet-control-alerts-overlay { /* Renamed for Leaflet control */
+            position: absolute; /* This might be overridden by Leaflet's control positioning */
+            bottom: 1rem;
+            left: 1rem;
+            z-index: 1000;
+            max-height: 200px;
+            width: 250px;
+            background-color: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            border-radius: 0.75rem;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 0.75rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            color: #1f2937;
+        }
+        .leaflet-control-alerts-overlay ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .leaflet-control-alerts-overlay li {
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+        }
+        .leaflet-control-alerts-overlay::-webkit-scrollbar { width: 4px; }
+        .leaflet-control-alerts-overlay::-webkit-scrollbar-track { background: transparent; }
+        .leaflet-control-alerts-overlay::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+        .leaflet-control-alerts-overlay::-webkit-scrollbar-thumb:hover { background-color: #9ea9b8; }
+
+        /* Styles for the Monthly/Daily trend chart's filter buttons */
+        .chart-filter-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            margin-bottom: 1rem;
+            justify-content: center;
+        }
+        .chart-filter-button {
+            padding: 0.3rem 0.6rem;
+            border-radius: 0.3rem;
+            background-color: #e0e7ff;
+            color: #4f46e5;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid #c7d2fe;
+            transition: all 0.2s ease-in-out;
+        }
+        .chart-filter-button.active {
+            background-color: #4f46e5;
+            color: white;
+            box-shadow: 0 2px 5px rgba(79, 70, 229, 0.2);
+        }
+        .chart-filter-button:hover {
+            background-color: #a5b4fc;
+        }
+
+        /* SVG Map specific styling */
+        .leaflet-control-pakistan-svg-overlay { /* Renamed for Leaflet control */
+            z-index: 500; /* Ensure this is below markers but above map tiles */
+            position: absolute;
+            pointer-events: none; /* Allows clicks to pass through to the map below */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* Adjust positioning as needed for the specific control */
+            top: 0; /* Example adjustment */
+            left: 0; /* Example adjustment */
+            width: 100%;
+            height: 100%;
+        }
+
+        #pakistan-map-svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            margin: auto;
+        }
+        #pakistan-map-svg path, #pakistan-map-svg circle {
+            fill: rgba(167, 243, 208, 0.6); /* Made semi-transparent so markers are visible */
+            stroke: #34d399;
+            stroke-width: 0.5;
+            transition: fill 0.3s ease, transform 0.1s ease;
+            cursor: pointer;
+            pointer-events: auto; /* Ensure SVG paths are clickable */
+        }
+        #pakistan-map-svg path:hover, #pakistan-map-svg circle:hover {
+            fill: rgba(110, 231, 183, 0.7); /* Slightly less transparent on hover */
+            transform: scale(1.005);
+        }
+        #pakistan-map-svg path.selected, #pakistan-map-svg circle.selected {
+            fill: rgba(5, 150, 105, 0.8); /* Opaque and darker for selected */
+            stroke: #047857;
+            stroke-width: 1.5;
+        }
+        
+        /* Styles for the custom HTML chart blocks (re-added for stability) */
+        .chart-block-custom { /* Renamed to avoid conflicts with potential future Chart.js blocks */
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            opacity: 0; /* Initial state for animation */
+            transform: translateY(30px); /* Initial state for animation */
+            animation: slideIn 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards; /* Slide-in animation */
+            transition: box-shadow 0.4s ease, transform 0.4s ease;
+            margin-bottom: 1rem; /* Space between custom blocks */
+        }
+
+        .chart-block-custom:last-child {
+            margin-bottom: 0; /* No margin after the last block */
+        }
+        
+        .chart-block-custom:hover {
+            transform: translateY(20px) scale(1.02); /* Slight lift and scale on hover */
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08); /* Enhanced shadow on hover */
+        }
+
+        /* Keyframe animation for sliding in chart blocks */
+        @keyframes slideIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Apply fade-in to direct children of custom chart blocks */
+        .chart-block-custom > * {
+            opacity: 0;
+            animation: fadeIn 0.6s ease forwards;
+        }
+
+        /* Stagger animations for elements within custom chart blocks */
+        .chart-block-custom .chart-header-custom { animation-delay: 0.3s; } /* Renamed to avoid general conflicts */
+        .chart-block-custom .bar-wrapper-custom { animation-delay: 0.4s; }
+        .chart-block-custom .legend-custom { animation-delay: 0.5s; }
+        .chart-block-custom .metric-group-custom { animation-delay: 0.4s; }
+
+
+        .chart-header-custom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-header-custom h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .chart-header-custom h3 svg {
+            width: 20px;
+            height: 20px;
+            color: var(--text-secondary);
+        }
+
+        .chart-header-custom .value-label-custom {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+        
+        .value-label-custom .counter {
+            color: var(--text-primary);
+            font-weight: 700;
+        }
+
+        /* --- Bar Styles for custom blocks --- */
+        .bar-wrapper-custom {
+            height: 28px;
+            background-color: var(--bar-bg);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .bar-custom {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .segment-custom {
+            height: 100%;
+            width: 0; /* Initial width for animation */
+            animation: 
+                fillBar 1.5s cubic-bezier(0.23, 1, 0.32, 1) forwards,
+                pulse-bar 3s infinite ease-in-out;
+            animation-delay: var(--delay, 0.5s);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: filter 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .segment-custom:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+        .segment-custom:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+        
+        /* Tooltip */
+        .segment-custom::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%) scale(0.8);
+            background-color: var(--text-primary);
+            color: var(--card-bg);
+            padding: 0.3rem 0.6rem;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        
+        .segment-custom:hover::after {
+            opacity: 1;
+            transform: translateX(-50%) scale(1);
+        }
+
+        .segment-custom span {
+            opacity: 0;
+            animation: fadeIn 1s ease forwards;
+            animation-delay: calc(var(--delay, 0.5s) + 1s);
+        }
+
+        /* Keyframe animation for filling the bar segments */
+        @keyframes fillBar {
+            to { width: var(--width); }
+        }
+        
+        /* Keyframe animation for subtle pulsing effect on bars */
+        @keyframes pulse-bar {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.08); }
+        }
+
+        /* Specific colors for different bar segments */
+        .segment-custom.valid { background-color: var(--c-valid); }
+        .segment-custom.fake { background-color: var(--c-fake); color: var(--text-primary); }
+        .segment-custom.age-1 { background-color: var(--c-age1); }
+        .segment-custom.age-2 { background-color: var(--c-age2); }
+        .segment-custom.age-3 { background-color: var(--c-age3); }
+        .segment-custom.age-4 { background-color: var(--c-age4); }
+        .segment-custom.training { background-color: var(--c-training); animation-name: fillBar, pulse-bar; }
+        .segment-custom.handbooks { background-color: var(--c-handbooks); animation-name: fillBar, pulse-bar; }
+        
+        /* Legend styles */
+        .legend-custom {
+            display: flex;
+            gap: 1.5rem;
+            margin-top: 1rem;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .legend-item-custom {
+            display: flex;
+            align-items: center;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .legend-item-custom::before {
+            content: '';
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+            background-color: var(--color); /* Uses custom property for color */
+            margin-right: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-grid">
+        <header class="card header flex flex-row items-center justify-between !py-2">
+    <div class="flex items-center gap-4">
+        <img src="https://www.sdpi.org/assets/images/sdpi-logo-2020.webp" alt="SDPI Logo" class="h-6">
+    </div>
+
+    <div class="flex items-center justify-center gap-6 flex-grow">
+        <h1 class="text-xl font-extrabold text-gray-900 text-gradient-blue-purple">DFLT Phase-2 | Status Deck</h1>
+
+        <div class="flex items-center gap-2">
+            <label for="provinceFilter" class="text-xs font-medium text-gray-600">Province:</label>
+            <select id="provinceFilter" class="block py-1 px-2 border border-gray-300 bg-gray-50 text-gray-900 rounded-md shadow-sm focus:outline-none focus:ring-accent-main focus:border-accent-main text-xs" onchange="updateDashboard()">
+                <option value="All">All</option>
+            </select>
+        </div>
+        <div class="text-right">
+            <p id="currentTime" class="font-bold text-gray-900 text-lg"></p>
+            <p id="currentDate" class="text-xs text-gray-600"></p>
+        </div>
+    </div>
+
+    <img src="https://www.germany.info/blob/2529124/aa988891d4e112d3080c55f7560e90ac/germannew-data.png" alt="DFLT Logo" class="h-10">
+</header>
+
+        <div class="card map-card !p-1 relative">
+            <div id="map"></div>
+            <div class="absolute top-2 right-2 z-[1000] bg-white/70 p-1 rounded-lg border border-gray-200">
+                <button id="toggleHeatmap" class="px-3 py-1 text-xs text-white bg-indigo-600 rounded-md">Toggle Heatmap</button>
+            </div>
+            
+            <div id="alertsOverlay" class="leaflet-control-alerts-overlay" style="display: none;">
+                <h3 class="text-md font-bold text-red-600 flex-shrink-0">Operational Alerts</h3>
+                <ul id="alertsList" class="text-sm space-y-2"></ul>
+            </div>
+
+            <div id="pakistan-svg-overlay" class="leaflet-control-pakistan-svg-overlay" style="display: none;">
+                <svg id="pakistan-map-svg" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid meet">
+                    <!-- Placeholder SVG paths for Pakistan provinces including AJK -->
+                    <path id="province-Punjab" d="M500 200 L700 300 L650 500 L450 400 Z" class="map-province" data-province-name="Punjab"></path>
+                    <path id="province-Sindh" d="M450 400 L650 500 L600 700 L400 600 Z" class="map-province" data-province-name="Sindh"></path>
+                    <path id="province-Khyber Pakhtunkhwa" d="M500 200 L400 100 L300 300 L450 400 Z" class="map-province" data-province-name="Khyber Pakhtunkhwa"></path>
+                    <path id="province-Balochistan" d="M400 600 L600 700 L400 750 L200 650 Z" class="map-province" data-province-name="Balochistan"></path>
+                    <path id="province-Azad Jammu & Kashmir" d="M700 300 L750 250 L700 150 L650 200 Z" class="map-province" data-province-name="Azad Jammu & Kashmir"></path>
+                    <path id="province-Gilgit-Baltistan" d="M400 100 L500 50 L600 100 L500 200 Z" class="map-province" data-province-name="Gilgit-Baltistan"></path>
+                    <circle cx="550" cy="280" r="10" fill="#facc15" stroke="#b45309" stroke-width="2" class="map-province" data-province-name="Islamabad Capital Territory"></circle>
+                </svg>
+            </div>
+        </div>
+        
+        <div class="kpi-main">
+            <div class="card justify-center">
+                <h3 class="text-sm font-medium text-gray-600 flex items-center justify-between">
+                    <span>Total Beneficiaries Trained</span>
+                    <span id="beneficiariesTargetPct" class="text-xs font-semibold text-teal-500">0%</span>
+                </h3>
+                <p id="totalBeneficiaries" class="text-4xl font-black text-indigo-600">0</p>
+                <span class="text-xs text-gray-500">Target: <span id="beneficiaryOverallTarget">0</span></span>
+                <div class="flex justify-between text-xs mt-2">
+                    <span class="text-gray-700"><span id="ruralBeneficiariesPct">0%</span> Rural</span>
+                    <span class="text-gray-700"><span id="urbanBeneficiariesPct">0%</span> Urban</span>
+                </div>
+            </div>
+            <div class="card justify-center">
+                <h3 class="text-sm font-medium text-gray-600 flex items-center justify-between">
+                    <span>Total Trainings Conducted</span>
+                    <span id="trainingsTargetPct" class="text-xs font-semibold text-emerald-500">0%</span>
+                </h3>
+                <p id="totalTrainings" class="text-4xl font-black text-indigo-600">0</p>
+                <span class="text-xs text-gray-500">Target: <span id="trainingOverallTarget">0</span></span>
+                <div class="flex justify-between text-xs mt-2">
+                    <span class="text-gray-700"><span id="ruralTrainingsPct">0%</span> Rural</span>
+                    <span class="text-gray-700"><span id="urbanTrainingsPct">0%</span> Urban</span>
+                </div>
+            </div>
+            <div class="card justify-center col-span-1">
+                <h3 class="text-sm font-medium text-gray-600">Handbooks Distributed</h3>
+                <p id="handbooksDistributed" class="text-4xl font-black text-blue-600 mt-1">0</p>
+                <p id="handbooksTargetPct" class="text-xl font-bold text-blue-500 mt-0">0% Target Achieved</p>
+            </div>
+        </div>
+
+        <div class="card provincial-summary-card">
+            <div class="flex items-center justify-between flex-shrink-0 mb-4">
+                <h3 id="provincialSummaryTitle" class="text-md font-bold text-gray-800">Provincial Performance Overview</h3>
+                <div class="flex items-center gap-2">
+                    <label for="provincialCardFilter" class="text-xs font-medium text-gray-600">Filter:</label>
+                    <select id="provincialCardFilter" class="block py-1 px-2 border border-gray-300 bg-gray-50 text-gray-900 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-xs"></select>
+                </div>
+            </div>
+            <div id="provincialSummaryContent" class="flex-grow flex flex-col p-4">
+                <p class="text-gray-500 text-sm text-center">Select a province to view its performance details.</p>
+                </div>
+        </div>
+
+        <div class="card monthly-trend-card">
+            <h3 class="text-md font-bold text-gray-800 flex-shrink-0">Beneficiaries Trend (8 Months)</h3>
+            <div class="chart-filter-buttons">
+                <button class="chart-filter-button active" data-unit="month" data-metric="beneficiaries">Monthly Beneficiaries</button>
+                <button class="chart-filter-button" data-unit="day" data-metric="beneficiaries">Daily Beneficiaries</button>
+                <button class="chart-filter-button" data-unit="month" data-metric="accounts">Monthly Accounts</button>
+            </div>
+            <div class="chart-container"><canvas id="monthlyTrendChart"></canvas></div>
+        </div>
+
+        <div class="card provincial-ranking-card">
+            <h3 class="text-md font-bold text-gray-800 flex-shrink-0">Provincial Ranking (by Beneficiaries)</h3>
+            <div class="flex gap-2 mb-2">
+                <button class="chart-filter-button active" data-sort-metric="total_trained">By Beneficiaries</button>
+                <button class="chart-filter-button" data-sort-metric="trainings_conducted">By Trainings</button>
+                <button class="chart-filter-button" data-sort-metric="pct_achieved_beneficiaries">By Target %</button>
+            </div>
+            <div class="table-container mt-2">
+                <table class="w-full text-left text-sm">
+                    <thead class="text-xs text-gray-600 uppercase bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-2">Rank</th>
+                            <th class="px-4 py-2">Province</th>
+                            <th class="px-4 py-2">Beneficiaries</th>
+                            <th class="px-4 py-2">Trainings</th>
+                            <th class="px-4 py-2">Target %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="provincialRankingTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card leaderboard-card">
+            <h3 class="text-md font-bold text-gray-800 flex-shrink-0">Top Trainers (Monthly Ranking)</h3>
+            <div class="flex gap-2 mb-2">
+                <button class="chart-filter-button active" data-sort-metric="total_trained">By Beneficiaries</button>
+                <button class="chart-filter-button" data-sort-metric="qa_rating">By QA Rating</button>
+            </div>
+            <div class="table-container mt-2">
+                <table class="w-full text-left text-sm">
+                    <thead class="text-xs text-gray-600 uppercase bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-2">Rank</th>
+                            <th class="px-4 py-2">Trainer</th>
+                            <th class="px-4 py-2">Beneficiaries</th>
+                            <th class="px-4 py-2">Target %</th>
+                            <th class="px-4 py-2">QA Rating</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables to store loaded JSON data
+        let dashboardData = null; // This will be populated by the JSON content
+
+        // Leaflet map, marker and heatmap layers
+        let map, markers = L.featureGroup(), heatLayer;
+        let monthlyTrendChart; // Chart.js instance for the monthly trend
+
+        // Define overall and provincial targets (these will be loaded from JSON now)
+        let globalTargets = {
+            provinces: {},
+            totalBeneficiaryTarget: 0,
+            totalTrainingTarget: 0
+        };
+
+        const AVERAGE_CLASSROOM_HOURS_PER_DAY = 4; // Fixed for now, could be dynamic
+
+        // Define a color palette for charts and map markers
+        const CHART_COLORS = {
+            primary: '#4f46e5', // Indigo
+            secondary: '#2dd4bf', // Teal
+            tertiary: '#fbbf24', // Amber
+            danger: '#ef4444', // Red
+            info: '#60a5fa', // Blue
+            success: '#34d399', // Green
+            background: '#f3f4f6', // Light gray background for charts
+            text: '#1f2937', // Dark gray text
+            gray: '#d1d5db',
+            lightBlue: '#bfdbfe',
+            lightGreen: '#d1fae5',
+            lightYellow: '#fef3c7',
+            lightRed: '#fee2e2',
+            lightPurple: '#e9d5ff'
+        };
+
+        // Custom colors for provinces on the map markers
+        const provinceColors = {
+            "Punjab": "#22c55e",
+            "Sindh": "#3b82f6",
+            "Khyber Pakhtunkhwa": "#f97316",
+            "Balochistan": "#ef4444",
+            "Gilgit-Baltistan": "#a855f7",
+            "Azad Jammu & Kashmir": "#06b6d4",
+            "Islamabad Capital Territory": "#facc15"
+        };
+
+
+        // --- Event Listeners and Initial Setup ---
+        document.addEventListener('DOMContentLoaded', () => {
+            updateTime(); // Display current time and date
+            setInterval(updateTime, 1000); // Update time every second
+
+            // IMPORTANT: Replace this with the actual content of your dflt_dashboard_data.json file
+            // You need to run the Python script to generate dflt_dashboard_data.json
+            // Then, open dflt_dashboard_data.json in a text editor, copy its entire content,
+            // and paste it here between the backticks.
+            const jsonDataString = `{
+    "status_deck_data": {
+        "overall_kpis": {
+            "total_beneficiaries_trained": 149950,
+            "total_beneficiary_target": 500000,
+            "total_trainings_conducted": 5000,
+            "total_training_target": 15000,
+            "top_province_name": "Punjab",
+            "top_province_pct": 33.7,
+            "rural_beneficiaries_pct": 70.0,
+            "urban_beneficiaries_pct": 30.0,
+            "rural_trainings_pct": 70.0,
+            "urban_trainings_pct": 30.0,
+            "handbooks_distributed_pct": 79.2
+        },
+        "provincial_ranking": [
+            {
+                "province": "Punjab",
+                "total_trained": 50570,
+                "pct_achieved_beneficiaries": 25.3,
+                "trainings_conducted": 1682,
+                "pct_achieved_trainings": 28.0,
+                "avg_cohort_size": 30.1
+            },
+            {
+                "province": "Sindh",
+                "total_trained": 36170,
+                "pct_achieved_beneficiaries": 30.1,
+                "trainings_conducted": 1202,
+                "pct_achieved_trainings": 34.3,
+                "avg_cohort_size": 30.1
+            },
+            {
+                "province": "Khyber Pakhtunkhwa",
+                "total_trained": 24040,
+                "pct_achieved_beneficiaries": 30.0,
+                "trainings_conducted": 801,
+                "pct_achieved_trainings": 32.0,
+                "avg_cohort_size": 30.0
+            },
+            {
+                "province": "Balochistan",
+                "total_trained": 12050,
+                "pct_achieved_beneficiaries": 30.1,
+                "trainings_conducted": 402,
+                "pct_achieved_trainings": 33.5,
+                "avg_cohort_size": 30.0
+            },
+            {
+                "province": "Azad Jammu & Kashmir",
+                "total_trained": 9030,
+                "pct_achieved_beneficiaries": 30.1,
+                "trainings_conducted": 301,
+                "pct_achieved_trainings": 33.4,
+                "avg_cohort_size": 30.0
+            },
+            {
+                "province": "Gilgit-Baltistan",
+                "total_trained": 6020,
+                "pct_achieved_beneficiaries": 30.1,
+                "trainings_conducted": 201,
+                "pct_achieved_trainings": 33.5,
+                "avg_cohort_size": 30.0
+            },
+            {
+                "province": "Islamabad Capital Territory",
+                "total_trained": 3020,
+                "pct_achieved_beneficiaries": 30.2,
+                "trainings_conducted": 101,
+                "pct_achieved_trainings": 33.7,
+                "avg_cohort_size": 29.9
+            }
+        ],
+        "beneficiaries_trend": {
+            "monthly": [
+                {
+                    "date": "2024-11-01",
+                    "beneficiaries": 18275,
+                    "accounts": 5472
+                },
+                {
+                    "date": "2024-12-01",
+                    "beneficiaries": 18510,
+                    "accounts": 5556
+                },
+                {
+                    "date": "2025-01-01",
+                    "beneficiaries": 18600,
+                    "accounts": 5580
+                },
+                {
+                    "date": "2025-02-01",
+                    "beneficiaries": 18000,
+                    "accounts": 5400
+                },
+                {
+                    "date": "2025-03-01",
+                    "beneficiaries": 18600,
+                    "accounts": 5580
+                },
+                {
+                    "date": "2025-04-01",
+                    "beneficiaries": 18000,
+                    "accounts": 5400
+                },
+                {
+                    "date": "2025-05-01",
+                    "beneficiaries": 18600,
+                    "accounts": 5580
+                },
+                {
+                    "date": "2025-06-01",
+                    "beneficiaries": 18000,
+                    "accounts": 5400
+                },
+                {
+                    "date": "2025-07-01",
+                    "beneficiaries": 18365,
+                    "accounts": 5508
+                }
+            ],
+            "daily": [
+                {
+                    "date": "2024-11-01",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-02",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-03",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-04",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-05",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-06",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-07",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-08",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-09",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-10",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-11",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-12",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-13",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-14",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-15",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-16",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-17",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-18",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-19",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-20",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-21",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-22",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-23",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-24",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-25",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-26",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-27",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-28",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-29",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-11-30",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-01",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-02",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-03",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-04",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-05",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-06",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-07",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-08",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-09",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-10",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-11",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-12",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-13",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-14",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-15",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-16",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-17",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-18",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-19",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-20",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-21",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-22",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-23",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-24",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-25",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-26",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-27",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-28",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-29",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-30",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2024-12-31",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-01",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-02",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-03",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-04",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-05",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-06",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-07",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-08",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-09",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-10",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-11",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-12",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-13",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-14",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-15",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-16",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-17",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-18",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-19",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-20",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-21",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-22",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-23",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-24",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-25",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-26",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-27",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-28",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-29",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-30",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-01-31",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-01",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-02",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-03",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-04",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-05",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-06",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-07",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-08",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-09",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-10",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-11",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-12",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-13",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-14",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-15",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-16",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-17",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-18",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-19",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-20",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-21",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-22",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-23",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-24",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-25",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-26",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-27",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-02-28",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-01",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-02",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-03",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-04",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-05",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-06",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-07",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-08",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-09",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-10",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-11",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-12",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-13",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-14",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-15",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-16",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-17",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-18",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-19",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-20",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-21",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-22",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-23",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-24",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-25",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-26",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-27",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-28",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-29",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-30",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-03-31",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-01",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-02",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-03",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-04",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-05",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-06",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-07",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-08",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-09",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-10",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-11",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-12",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-13",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-14",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-15",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-16",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-17",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-18",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-19",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-20",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-21",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-22",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-23",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-24",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-25",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-26",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-27",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-28",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-29",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-04-30",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-01",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-02",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-03",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-04",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-05",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-06",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-07",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-08",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-09",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-10",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-11",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-12",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-13",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-14",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-15",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-16",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-17",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-18",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-19",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-20",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-21",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-22",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-23",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-24",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-25",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-26",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-27",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-28",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-29",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-30",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-05-31",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-01",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-02",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-03",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-04",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-05",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-06",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-07",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-08",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-09",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-10",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-11",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-12",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-13",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-14",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-15",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-16",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-17",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-18",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-19",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-20",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-21",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-22",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-23",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-24",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-25",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-26",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-27",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-28",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-29",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-06-30",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-01",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-02",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-03",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-04",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-05",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-06",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-07",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-08",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-09",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-10",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-11",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-12",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-13",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-14",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-15",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-16",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-17",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-18",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-19",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-20",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-21",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-22",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-23",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-24",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-25",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                },
+                {
+                    "date": "2025-07-26",
+                    "beneficiaries": 600,
+                    "accounts": 180
+                }
+            ],
+            "monthly_accounts": [
+                {
+                    "date": "2024-11-01",
+                    "accounts": 5472
+                },
+                {
+                    "date": "2024-12-01",
+                    "accounts": 5556
+                },
+                {
+                    "date": "2025-01-01",
+                    "accounts": 5580
+                },
+                {
+                    "date": "2025-02-01",
+                    "accounts": 5400
+                },
+                {
+                    "date": "2025-03-01",
+                    "accounts": 5580
+                },
+                {
+                    "date": "2025-04-01",
+                    "accounts": 5400
+                },
+                {
+                    "date": "2025-05-01",
+                    "accounts": 5580
+                },
+                {
+                    "date": "2025-06-01",
+                    "accounts": 5400
+                },
+                {
+                    "date": "2025-07-01",
+                    "accounts": 5508
+                }
+            ]
+        },
+        "top_trainers_ranking": [
+            {
+                "trainer_name": "Trainer 001",
+                "total_trained": 1500,
+                "pct_achieved": 600.0,
+                "trainings_conducted": 50,
+                "avg_cohort_size": 30.0,
+                "qa_rating": 7.5
+            },
+            {
+                "trainer_name": "Trainer 002",
+                "total_trained": 1470,
+                "pct_achieved": 588.0,
+                "trainings_conducted": 49,
+                "avg_cohort_size": 30.0,
+                "qa_rating": 7.5
+            },
+            {
+                "trainer_name": "Trainer 003",
+                "total_trained": 1440,
+                "pct_achieved": 576.0,
+                "trainings_conducted": 48,
+                "avg_cohort_size": 30.0,
+                "qa_rating": 7.5
+            },
+            {
+                "trainer_name": "Trainer 004",
+                "total_trained": 1410,
+                "pct_achieved": 564.0,
+                "trainings_conducted": 47,
+                "avg_cohort_size": 30.0,
+                "qa_rating": 7.5
+            },
+            {
+                "trainer_name": "Trainer 005",
+                "total_trained": 1380,
+                "pct_achieved": 552.0,
+                "trainings_conducted": 46,
+                "avg_cohort_size": 30.0,
+                "qa_rating": 7.5
+            }
+        ],
+        "performance_overviews_kpis": {
+            "cnic_verification": {
+                "valid_count": 145451,
+                "fake_count": 4449,
+                "valid_pct": 97.0,
+                "fake_pct": 3.0
+            },
+            "age_demographics": {
+                "20-25_pct": 20.0,
+                "26-35_pct": 35.0,
+                "36-45_pct": 25.0,
+                "45+_pct": 20.0
+            },
+            "avg_training_time_hours": 4.0,
+            "avg_engagement_rate_pct": 7.5,
+            "avg_retention_rate_pct": 6.9
+        },
+        "map_data": [
+            {
+                "training_session_id": "20241101-Trainer047-00000",
+                "aspc_name": "Trainer 047",
+                "total_beneficiaries_trained": 30,
+                "total_target_pct_achieved": 100.0,
+                "under_ic": "IC-003",
+                "duty_station": "Peshawar Centre",
+                "district": "Sialkot",
+                "total_trainings_this_month": 1,
+                "latitude": 30.1388,
+                "longitude": 70.8351,
+                "province": "Punjab"
+            },
+            {
+                "training_session_id": "20241101-Trainer034-00001",
+                "aspc_name": "Trainer 034",
+                "total_beneficiaries_trained": 34,
+                "total_target_pct_achieved": 113.3,
+                "under_ic": "IC-019",
+                "duty_station": "Multan Field",
+                "district": "Sialkot",
+                "total_trainings_this_month": 1,
+                "latitude": 30.7303,
+                "longitude": 73.1818,
+                "province": "Punjab"
+            }
+        ],
+        "system_alerts": []
+    },
+    "ic_deck_data": {
+        "overall_summary_kpis": {
+            "total_trainers_under_ic": 100,
+            "active_trainers": 88,
+            "monthly_beneficiaries": 18365,
+            "beneficiary_target_achieved_pct": 73.5,
+            "monthly_trainings": 600,
+            "trainings_vs_last_month_pct": 2.5,
+            "avg_attendance_rate": 87.5,
+            "pending_reports": 12,
+            "field_monitoring_visits": 250,
+            "visits_target_achieved_pct": 90.0
+        },
+        "team_performance_ranking": [
+            {
+                "trainer_name": "Trainer 001",
+                "province": "Punjab",
+                "district": "Sialkot",
+                "beneficiaries_this_month": 30,
+                "trainings_this_month": 1,
+                "target_pct": 12.0,
+                "status": "Active",
+                "trainer_lat": 30.1388,
+                "trainer_lon": 70.8351,
+                "ic_id": "IC-003"
+            },
+            {
+                "trainer_name": "Trainer 002",
+                "province": "Punjab",
+                "district": "Sialkot",
+                "beneficiaries_this_month": 28,
+                "trainings_this_month": 1,
+                "target_pct": 11.2,
+                "status": "Active",
+                "trainer_lat": 30.7303,
+                "trainer_lon": 73.1818,
+                "ic_id": "IC-019"
+            }
+        ],
+        "attendance_compliance_trend": [
+            {
+                "month": "2024-11",
+                "avg_attendance_pct": 85.0,
+                "avg_compliance_pct": 88.0
+            },
+            {
+                "month": "2024-12",
+                "avg_attendance_pct": 86.0,
+                "avg_compliance_pct": 89.0
+            },
+            {
+                "month": "2025-01",
+                "avg_attendance_pct": 87.0,
+                "avg_compliance_pct": 90.0
+            },
+            {
+                "month": "2025-02",
+                "avg_attendance_pct": 88.0,
+                "avg_compliance_pct": 91.0
+            },
+            {
+                "month": "2025-03",
+                "avg_attendance_pct": 89.0,
+                "avg_compliance_pct": 92.0
+            },
+            {
+                "month": "2025-04",
+                "avg_attendance_pct": 90.0,
+                "avg_compliance_pct": 93.0
+            },
+            {
+                "month": "2025-05",
+                "avg_attendance_pct": 91.0,
+                "avg_compliance_pct": 94.0
+            },
+            {
+                "month": "2025-06",
+                "avg_attendance_pct": 92.0,
+                "avg_compliance_pct": 95.0
+            },
+            {
+                "month": "2025-07",
+                "avg_attendance_pct": 93.0,
+                "avg_compliance_pct": 96.0
+            }
+        ],
+        "bottleneck_identification": [
+            {
+                "reason": "Lack of Venue Availability",
+                "count": 120
+            },
+            {
+                "reason": "Low Beneficiary Mobilization",
+                "count": 110
+            },
+            {
+                "reason": "Trainer Absences",
+                "count": 90
+            },
+            {
+                "reason": "Material Shortages",
+                "count": 80
+            },
+            {
+                "reason": "Technical Issues",
+                "count": 70
+            },
+            {
+                "reason": "Slow Reporting",
+                "count": 50
+            }
+        ],
+        "training_type_distribution": [
+            {
+                "type": "08:00",
+                "count": 1200
+            },
+            {
+                "type": "09:00",
+                "count": 1100
+            },
+            {
+                "type": "10:00",
+                "count": 1000
+            }
+        ],
+        "recent_field_updates": [
+            {
+                "date": "2025-07-26",
+                "trainer": "Trainer 047",
+                "type": "Constructive",
+                "notes": "Constructive feedback on training by Trainer 047 in Sialkot."
+            },
+            {
+                "date": "2025-07-26",
+                "trainer": "Trainer 034",
+                "type": "Logistics Query",
+                "notes": "Logistics Query feedback on training by Trainer 034 in Sialkot."
+            }
+        ],
+        "trainer_activity_map_data": [
+            {
+                "trainer_name": "Trainer 001",
+                "ic_id": "IC-003",
+                "latitude": 30.1388,
+                "longitude": 70.8351,
+                "status": "Active",
+                "beneficiaries_last_report": 30,
+                "last_activity_date": "2025-07-26"
+            },
+            {
+                "trainer_name": "Trainer 002",
+                "ic_id": "IC-019",
+                "latitude": 30.7303,
+                "longitude": 73.1818,
+                "status": "Active",
+                "beneficiaries_last_report": 34,
+                "last_activity_date": "2025-07-26"
+            }
+        ],
+        "top_ics_ranking": [
+            {
+                "ic_name": "IC-001",
+                "total_trainers_supervised": 5,
+                "total_handbooks_distributed": 9375,
+                "avg_retention_rate": 7.5,
+                "target_achieved_pct": 75.0,
+                "monitoring_visits": 20
+            },
+            {
+                "ic_name": "IC-002",
+                "total_trainers_supervised": 5,
+                "total_handbooks_distributed": 9375,
+                "avg_retention_rate": 7.5,
+                "target_achieved_pct": 75.0,
+                "monitoring_visits": 20
+            }
+        ]
+    },
+    "trainer_deck_data": {
+        "all_trainers_data": {
+            "Trainer 001": {
+                "monthly_target_achievement": {
+                    "achieved": 1500,
+                    "target": 250,
+                    "percentage": 600.0,
+                    "status": "On Track"
+                },
+                "performance_trend": [
+                    {
+                        "date": "2024-11-01",
+                        "beneficiaries": 30,
+                        "accounts": 9
+                    },
+                    {
+                        "date": "2024-12-01",
+                        "beneficiaries": 60,
+                        "accounts": 18
+                    },
+                    {
+                        "date": "2025-01-01",
+                        "beneficiaries": 90,
+                        "accounts": 27
+                    },
+                    {
+                        "date": "2025-02-01",
+                        "beneficiaries": 120,
+                        "accounts": 36
+                    },
+                    {
+                        "date": "2025-03-01",
+                        "beneficiaries": 150,
+                        "accounts": 45
+                    },
+                    {
+                        "date": "2025-04-01",
+                        "beneficiaries": 180,
+                        "accounts": 54
+                    },
+                    {
+                        "date": "2025-05-01",
+                        "beneficiaries": 210,
+                        "accounts": 63
+                    },
+                    {
+                        "date": "2025-06-01",
+                        "beneficiaries": 240,
+                        "accounts": 72
+                    },
+                    {
+                        "date": "2025-07-01",
+                        "beneficiaries": 270,
+                        "accounts": 81
+                    }
+                ],
+                "skill_assessment": {
+                    "labels": [
+                        "Clarity",
+                        "Engagement",
+                        "Content",
+                        "Logistics"
+                    ],
+                    "self": [
+                        85,
+                        80,
+                        82,
+                        78
+                    ],
+                    "qa": [
+                        75,
+                        78,
+                        76,
+                        74
+                    ]
+                },
+                "activity_calendar": {
+                    "dates_with_activity": [
+                        "2025-07-22",
+                        "2025-07-15",
+                        "2025-07-08",
+                        "2025-07-01"
+                    ]
+                },
+                "recent_sessions_log": [
+                    {
+                        "ID": "20250722-Trainer001-00000",
+                        "Date": "2025-07-22",
+                        "District": "Rawalpindi",
+                        "Beneficiaries": 38,
+                        "Accounts": 12,
+                        "QA": 88,
+                        "Self": {
+                            "Clarity": 90,
+                            "Engagement": 85,
+                            "Content": 87,
+                            "Logistics": 82
+                        },
+                        "Audio": true,
+                        "Alert": null
+                    },
+                    {
+                        "ID": "20250715-Trainer001-00001",
+                        "Date": "2025-07-15",
+                        "District": "Lahore",
+                        "Beneficiaries": 25,
+                        "Accounts": 5,
+                        "QA": 75,
+                        "Self": {
+                            "Clarity": 80,
+                            "Engagement": 75,
+                            "Content": 80,
+                            "Logistics": 70
+                        },
+                        "Audio": true,
+                        "Alert": {
+                            "type": "warning",
+                            "message": "Conversion rate of 20% is below the 30% target."
+                        }
+                    },
+                    {
+                        "ID": "20250708-Trainer001-00002",
+                        "Date": "2025-07-08",
+                        "District": "Lahore",
+                        "Beneficiaries": 40,
+                        "Accounts": 15,
+                        "QA": 90,
+                        "Self": {
+                            "Clarity": 92,
+                            "Engagement": 88,
+                            "Content": 90,
+                            "Logistics": 85
+                        },
+                        "Audio": true,
+                        "Alert": {
+                            "type": "info",
+                            "message": "Excellent engagement scores. Consider sharing techniques."
+                        }
+                    },
+                    {
+                        "ID": "20250701-Trainer001-00003",
+                        "Date": "2025-07-01",
+                        "District": "Sialkot",
+                        "Beneficiaries": 30,
+                        "Accounts": 10,
+                        "QA": 85,
+                        "Self": {
+                            "Clarity": 90,
+                            "Engagement": 85,
+                            "Content": 88,
+                            "Logistics": 80
+                        },
+                        "Audio": true,
+                        "Alert": null
+                    }
+                ],
+                "alerts_recommendations": [
+                    {
+                        "type": "warning",
+                        "message": "Low attendance detected.",
+                        "date": "2025-07-15"
+                    },
+                    {
+                        "type": "info",
+                        "message": "Excellent engagement scores. Consider sharing techniques.",
+                        "date": "2025-07-08"
+                    }
+                ]
+            }
+        },
+        "profiles": {
+            "Trainer 001": {
+                "name": "Trainer 001",
+                "id": "TRN-001",
+                "location": "Lahore, Punjab",
+                "ic": "IC-003",
+                "status": "Active",
+                "target": 250
+            },
+            "Trainer 002": {
+                "name": "Trainer 002",
+                "id": "TRN-002",
+                "location": "Karachi, Sindh",
+                "ic": "IC-019",
+                "status": "Active",
+                "target": 250
+            }
+        }
+    },
+    "qa_deck_data": {
+        "overall_kpis": {
+            "total_trainings_qa_checked": 500,
+            "avg_qa_score": 7.5,
+            "trainers_monitored": 100,
+            "critical_trainings_pct": 25.0
+        },
+        "qa_score_distribution": {
+            "labels": [
+                "Excellent",
+                "Good",
+                "Average",
+                "Needs Improvement",
+                "Critical"
+            ],
+            "counts": [
+                100,
+                150,
+                150,
+                75,
+                25
+            ]
+        },
+        "concept_coverage_analysis": [
+            {
+                "concept": "Section 1",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 2",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 3",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 4",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 5",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 6",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 7",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 8",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 9",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 10",
+                "covered_pct": 50.0
+            }
+        ],
+        "qa_trend_by_month": [
+            {
+                "month": "2024-11",
+                "avg_qa_score": 7.5,
+                "trainings_qa": 50
+            },
+            {
+                "month": "2024-12",
+                "avg_qa_score": 7.5,
+                "trainings_qa": 50
+            },
+            {
+                "month": "2025-01",
+                "avg_qa_score": 7.5,
+                "trainings_qa": 50
+            },
+            {
+                "month": "2025-02",
+                "avg_qa_score": 7.5,
+                "trainings_qa": 50
+            },
+            {
+                "month": "2025-03",
+                "avg_qa_score": 7.5,
+                "trainings_qa": 50
+            },
+            {
+                "month": "2025-04",
+                "avg_qa_score": 7.5,
+                "trainings_qa": 50
+            },
+            {
+                "month": "2025-05",
+                "avg_qa_score": 7.5,
+                "trainings_qa": 50
+            },
+            {
+                "month": "2025-06",
+                "avg_qa_score": 7.5,
+                "trainings_qa": 50
+            },
+            {
+                "month": "2025-07",
+                "avg_qa_score": 7.5,
+                "trainings_qa": 50
+            }
+        ],
+        "top_qa_team_members": [
+            {
+                "name": "QA-001",
+                "avg_score": 8.5,
+                "trainings_monitored": 50
+            },
+            {
+                "name": "QA-002",
+                "avg_score": 8.5,
+                "trainings_monitored": 50
+            }
+        ],
+        "qa_alerts": [
+            {
+                "type": "danger",
+                "message": "Trainer Trainer 001 scored low (5) on 2025-07-20.",
+                "date": "2025-07-20"
+            },
+            {
+                "type": "warning",
+                "message": "Observation for Trainer 002 on 2025-07-22: Some weaknesses observed.",
+                "date": "2025-07-22"
+            }
+        ],
+        "qa_map_data": [
+            {
+                "qa_id": "QA-001",
+                "trainer_name": "Trainer 001",
+                "training_date": "2025-07-20",
+                "province": "Punjab",
+                "district": "Lahore",
+                "latitude": 30.1388,
+                "longitude": 70.8351,
+                "qa_score": 8
+            },
+            {
+                "qa_id": "QA-002",
+                "trainer_name": "Trainer 002",
+                "training_date": "2025-07-22",
+                "province": "Sindh",
+                "district": "Karachi",
+                "latitude": 30.7303,
+                "longitude": 73.1818,
+                "qa_score": 7
+            }
+        ]
+    },
+    "recording_review_deck_data": {
+        "overall_kpis": {
+            "total_recordings_reviewed": 800,
+            "avg_audio_quality_rating": 3.0,
+            "avg_trainer_performance_rating": 7.5,
+            "flagged_recordings_pct": 20.0
+        },
+        "audio_quality_distribution": {
+            "labels": [
+                "Excellent",
+                "Good",
+                "Average",
+                "Poor",
+                "Very Poor"
+            ],
+            "counts": [
+                160,
+                240,
+                240,
+                120,
+                40
+            ]
+        },
+        "trainer_performance_breakdown": {
+            "labels": [
+                "Engagement",
+                "Clarity",
+                "Adherence",
+                "Overall"
+            ],
+            "self_scores": [
+                8.5,
+                8.5,
+                8.5,
+                8.5
+            ],
+            "qa_scores": [
+                7.5,
+                7.5,
+                7.5,
+                7.5
+            ]
+        },
+        "concept_coverage_from_audio": [
+            {
+                "concept": "Section 1",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 2",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 3",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 4",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 5",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 6",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 7",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 8",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 9",
+                "covered_pct": 50.0
+            },
+            {
+                "concept": "Section 10",
+                "covered_pct": 50.0
+            }
+        ],
+        "review_trend_by_month": [
+            {
+                "month": "2024-11",
+                "avg_performance_score": 7.5,
+                "recordings_reviewed": 80
+            },
+            {
+                "month": "2024-12",
+                "avg_performance_score": 7.5,
+                "recordings_reviewed": 80
+            },
+            {
+                "month": "2025-01",
+                "avg_performance_score": 7.5,
+                "recordings_reviewed": 80
+            },
+            {
+                "month": "2025-02",
+                "avg_performance_score": 7.5,
+                "recordings_reviewed": 80
+            },
+            {
+                "month": "2025-03",
+                "avg_performance_score": 7.5,
+                "recordings_reviewed": 80
+            },
+            {
+                "month": "2025-04",
+                "avg_performance_score": 7.5,
+                "recordings_reviewed": 80
+            },
+            {
+                "month": "2025-05",
+                "avg_performance_score": 7.5,
+                "recordings_reviewed": 80
+            },
+            {
+                "month": "2025-06",
+                "avg_performance_score": 7.5,
+                "recordings_reviewed": 80
+            },
+            {
+                "month": "2025-07",
+                "avg_performance_score": 7.5,
+                "recordings_reviewed": 80
+            }
+        ],
+        "top_reviewers": [
+            {
+                "name": "Reviewer-001",
+                "avg_score": 7.5,
+                "recordings_reviewed": 80
+            },
+            {
+                "name": "Reviewer-002",
+                "avg_score": 7.5,
+                "recordings_reviewed": 80
+            }
+        ],
+        "recommendations_summary": [
+            {
+                "recommendation_type": "More interactive activities.",
+                "count": 400
+            },
+            {
+                "recommendation_type": "Focus on time management.",
+                "count": 200
+            },
+            {
+                "recommendation_type": "Improve clarity in explanations.",
+                "count": 200
+            }
+        ]
+    }
+}`; // Replace this with your actual JSON content
+            
+            try {
+                dashboardData = JSON.parse(jsonDataString);
+                console.log("Dashboard data loaded from embedded JSON.");
+                initializeDashboard(); // Call the main initialization function
+            } catch (error) {
+                console.error("Failed to parse embedded JSON data:", error);
+                alert("Embedded dashboard data is invalid. Please check the JSON format.");
+            }
+        });
+
+        function initializeDashboard() {
+            // Initialize global targets from loaded data
+            globalTargets.provinces = dashboardData.status_deck_data.provincial_ranking.reduce((acc, p) => {
+                acc[p.province] = {
+                    target_beneficiaries: p.target_beneficiaries || 0, // Use target from JSON if available, else 0
+                    target_trainings: p.target_trainings || 0
+                };
+                return acc;
+            }, {});
+            globalTargets.totalBeneficiaryTarget = dashboardData.status_deck_data.overall_kpis.total_beneficiary_target;
+            globalTargets.totalTrainingTarget = dashboardData.status_deck_data.overall_kpis.total_training_target;
+
+
+            populateFilters(); // Populates main header filter
+            populateProvincialCardFilter(); // Populates the new card-specific filter
+
+            initializeMap(); // Setup the Leaflet map
+            initializeCharts(); // Initializes only Monthly Trend Chart (other charts are dynamic HTML)
+            
+            updateDashboard(); // Initial call to render all dashboard elements based on 'All Provinces' filter
+
+            // Set initial state for Provincial Summary card to Punjab (as per original HTML)
+            const initialProvincialCardFilterValue = 'Punjab'; // Default to Punjab
+            const provincialCardFilterElement = document.getElementById('provincialCardFilter');
+            if (provincialCardFilterElement) {
+                provincialCardFilterElement.value = initialProvincialCardFilterValue;
+                updateProvincialSummaryContent(initialProvincialCardFilterValue);
+            } else {
+                document.getElementById('provincialSummaryContent').innerHTML = `<p class="text-gray-500 text-sm text-center">Select a province to view its performance details.</p>`;
+                document.getElementById('provincialSummaryTitle').textContent = `Provincial Performance Overview`;
+            }
+
+            // Event listener for Monthly Trend Chart filter buttons
+            document.querySelector('.monthly-trend-card .chart-filter-buttons').addEventListener('click', (event) => {
+                if (event.target.classList.contains('chart-filter-button')) {
+                    document.querySelector('.monthly-trend-card .chart-filter-buttons').querySelectorAll('.chart-filter-button').forEach(btn => btn.classList.remove('active'));
+                    event.target.classList.add('active');
+                    updateMonthlyTrendChart(); // Redraw chart with new unit/metric (data comes from pre-processed globals)
+                }
+            });
+
+            // Event listener for Provincial Ranking sorting buttons
+            document.querySelector('.provincial-ranking-card .flex.gap-2').addEventListener('click', (event) => {
+                if (event.target.classList.contains('chart-filter-button')) {
+                    document.querySelector('.provincial-ranking-card .flex.gap-2').querySelectorAll('.chart-filter-button').forEach(btn => btn.classList.remove('active'));
+                    event.target.classList.add('active');
+                    updateProvincialRanking(); // Update ranking table (data comes from pre-processed globals)
+                }
+            });
+
+            // Event listener for Leaderboard sorting buttons
+            document.querySelector('.leaderboard-card .flex.gap-2').addEventListener('click', (event) => {
+                if (event.target.classList.contains('chart-filter-button')) {
+                    document.querySelector('.leaderboard-card .flex.gap-2').querySelectorAll('.chart-filter-button').forEach(btn => btn.classList.remove('active'));
+                    event.target.classList.add('active');
+                    updateLeaderboard(); // Update leaderboard table (data comes from pre-processed globals)
+                }
+            });
+
+            // Event listener for Heatmap toggle button
+            document.getElementById('toggleHeatmap').addEventListener('click', toggleHeatmap);
+
+            // Map click handler (only updates main filter, doesn't directly trigger provincial card)
+            // This is attached to the SVG map element itself, which is now a Leaflet control
+            document.getElementById('pakistan-map-svg').addEventListener('click', (event) => {
+                let targetElement = event.target;
+                // Traverse up the DOM tree to find the province path/circle
+                while (targetElement && targetElement !== this && !targetElement.dataset.provinceName) {
+                    targetElement = targetElement.parentNode;
+                }
+
+                if (targetElement && targetElement.dataset.provinceName) {
+                    const provinceName = targetElement.dataset.provinceName;
+                    document.getElementById('provinceFilter').value = provinceName; // Update main filter
+                    updateDashboard(); // Re-render dashboard elements controlled by main filter
+
+                    // Map selection can optionally update the card's filter as well for sync
+                    const provincialCardFilter = document.getElementById('provincialCardFilter');
+                    if (provincialCardFilter && provincialCardFilter.value !== provinceName) {
+                        provincialCardFilter.value = provinceName;
+                        updateProvincialSummaryContent(provinceName);
+                    }
+                } else {
+                    document.getElementById('provinceFilter').value = 'All'; // Reset main filter
+                    updateDashboard(); // Re-render dashboard elements controlled by main filter
+                    // Also reset provincial card filter and content
+                    const provincialCardFilter = document.getElementById('provincialCardFilter');
+                    if (provincialCardFilter) {
+                        provincialCardFilter.value = 'Select Province';
+                        document.getElementById('provincialSummaryContent').innerHTML = `<p class="text-gray-500 text-sm text-center">Select a province to view its performance details.</p>`;
+                        document.getElementById('provincialSummaryTitle').textContent = `Provincial Performance Overview`;
+                    }
+                }
+            });
+
+            // New: Listener for the Provincial Summary card's specific filter
+            document.getElementById('provincialCardFilter').addEventListener('change', (event) => {
+                const selectedProvince = event.target.value;
+                if (selectedProvince !== 'All' && selectedProvince !== 'Select Province') {
+                    updateProvincialSummaryContent(selectedProvince);
+                } else {
+                    document.getElementById('provincialSummaryContent').innerHTML = `<p class="text-gray-500 text-sm text-center">Select a province to view its performance details.</p>`;
+                    document.getElementById('provincialSummaryTitle').textContent = `Provincial Performance Overview`;
+                }
+                // Also update the map's selected province if the card filter changes (for visual consistency on map)
+                document.querySelectorAll('#pakistan-map-svg path, #pakistan-map-svg circle').forEach(path => path.classList.remove('selected'));
+                if (selectedProvince !== 'All' && selectedProvince !== 'Select Province') {
+                    const svgProvinceElement = document.querySelector(`#pakistan-map-svg [data-province-name="${selectedProvince}"]`);
+                    if (svgProvinceElement) {
+                        svgProvinceElement.classList.add('selected');
+                    }
+                }
+            });
+        }
+
+        // --- UI Update Functions ---
+
+        // Update current time and date in the header
+        function updateTime() {
+            const now = new Date();
+            // Use Pakistan Standard Time (PKT) for current time/date display
+            // This requires the browser to support `timeZone` option correctly, which modern browsers do.
+            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Karachi' };
+            const dateOptions = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'Asia/Karachi' };
+
+            const currentTimeElement = document.getElementById('currentTime');
+            const currentDateElement = document.getElementById('currentDate');
+
+            if (currentTimeElement) currentTimeElement.textContent = now.toLocaleTimeString('en-GB', timeOptions);
+            if (currentDateElement) currentDateElement.textContent = now.toLocaleDateString('en-US', dateOptions);
+        }
+
+        // Populate the main province filter dropdown
+        function populateFilters() {
+            const provinceFilter = document.getElementById('provinceFilter');
+            provinceFilter.innerHTML = '<option value="All">All Provinces</option>';
+            const uniqueProvinces = [...new Set(dashboardData.status_deck_data.map_data.map(item => item.province).filter(Boolean))].sort();
+            uniqueProvinces.forEach(p => {
+                provinceFilter.add(new Option(p, p));
+            });
+        }
+
+        // Populate the provincial summary card's filter dropdown
+        function populateProvincialCardFilter() {
+            const provincialCardFilter = document.getElementById('provincialCardFilter');
+            provincialCardFilter.innerHTML = '<option value="Select Province">Select Province</option>'; // Initial placeholder
+            const uniqueProvinces = [...new Set(dashboardData.status_deck_data.map_data.map(item => item.province).filter(Boolean))].sort();
+            uniqueProvinces.forEach(p => {
+                provincialCardFilter.add(new Option(p, p));
+            });
+            // Set default selected to Punjab if available
+            if (uniqueProvinces.includes('Punjab')) {
+                provincialCardFilter.value = 'Punjab';
+            }
+        }
+
+
+        // Initialize Leaflet Map
+        function initializeMap() {
+            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([30.3753, 69.3451], 5.5); // Centered on Pakistan, moderate zoom
+            
+            // Add a base tile layer (light mode for better visibility with colorful markers)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>'
+            }).addTo(map);
+
+            // Initialize marker and heatmap layers as FeatureGroups
+            markers = L.featureGroup().addTo(map);
+            heatLayer = L.heatLayer([], {
+                radius: 25,
+                blur: 15,
+                maxZoom: 10,
+                gradient: { 0.4: '#60a5fa', 0.65: '#2dd4bf', 1: '#ef4444' } // Blue to Teal to Red gradient
+            });
+
+            // Add custom Leaflet controls for alerts and SVG overlay
+            const alertsOverlayDiv = document.getElementById('alertsOverlay');
+            const alertsControl = L.control({ position: 'bottomleft' });
+            alertsControl.onAdd = function (map) {
+                // Prevent map clicks from propagating to the overlay
+                L.DomEvent.disableClickPropagation(alertsOverlayDiv);
+                alertsOverlayDiv.style.display = 'flex'; // Ensure it's visible if alerts exist
+                return alertsOverlayDiv;
+            };
+            alertsControl.addTo(map);
+
+            const svgOverlayDiv = document.getElementById('pakistan-svg-overlay');
+            const svgControl = L.control({ position: 'topleft' });
+            svgControl.onAdd = function (map) {
+                // This is a placeholder SVG. For accurate Pakistan boundaries with AJK,
+                // you would need a more complex GeoJSON overlay or a specialized map service.
+                // This SVG is illustrative for showing interaction.
+                L.DomEvent.disableClickPropagation(svgOverlayDiv);
+                return svgOverlayDiv;
+            };
+            svgControl.addTo(map);
+
+            // Adjust SVG overlay position and size with map movements
+            map.on('moveend zoomend resize', () => {
+                const mapBounds = map.getBounds();
+                const southWest = map.latLngToContainerPoint(mapBounds.getSouthWest());
+                const northEast = map.latLngToContainerPoint(mapBounds.getNorthEast());
+
+                const svgContainer = document.querySelector('.leaflet-control-pakistan-svg-overlay');
+                if (svgContainer) {
+                    // Position and size the SVG container to cover the map viewport
+                    svgContainer.style.left = `${southWest.x}px`;
+                    svgContainer.style.top = `${northEast.y}px`;
+                    svgContainer.style.width = `${northEast.x - southWest.x}px`;
+                    svgContainer.style.height = `${southWest.y - northEast.y}px`;
+                }
+            });
+            map.fire('moveend'); // Trigger initial positioning
+        }
+
+
+        // Toggle between marker layer and heatmap layer on the map
+        function toggleHeatmap() {
+            const svgOverlay = document.querySelector('.leaflet-control-pakistan-svg-overlay');
+            if (map.hasLayer(heatLayer)) {
+                map.removeLayer(heatLayer);
+                map.addLayer(markers);
+                if (svgOverlay) svgOverlay.style.display = 'flex'; // Show SVG when heatmap is off
+            } else {
+                map.removeLayer(markers);
+                map.addLayer(heatLayer);
+                if (svgOverlay) svgOverlay.style.display = 'none'; // Hide SVG when heatmap is on
+            }
+        }
+
+        // Main function to update all dashboard components
+        function updateDashboard() {
+            const mainFilterValue = document.getElementById('provinceFilter').value;
+            const filteredMapData = dashboardData.status_deck_data.map_data.filter(item => mainFilterValue === 'All' || item.province === mainFilterValue);
+
+            updateKPIs(mainFilterValue); // KPIs are calculated from overall data, not filtered map data
+            updateMapAndHeatmap(filteredMapData);
+            updateLeaderboard(); // Now uses data from dashboardData.status_deck_data.top_trainers_ranking
+            updateProvincialRanking(); // Now uses data from dashboardData.status_deck_data.provincial_ranking
+
+            // Determine current chart unit and metric to update monthly trend chart
+            const activeUnitButton = document.querySelector('.monthly-trend-card .chart-filter-buttons .active');
+            const currentUnit = activeUnitButton ? activeUnitButton.dataset.unit : 'month';
+            const currentMetric = activeUnitButton ? activeUnitButton.dataset.metric : 'beneficiaries';
+            updateMonthlyTrendChart(currentUnit, currentMetric);
+
+            // Update SVG map province selection visual
+            document.querySelectorAll('#pakistan-map-svg path, #pakistan-map-svg circle').forEach(path => path.classList.remove('selected'));
+            if (mainFilterValue !== 'All') {
+                const svgProvinceElement = document.querySelector(`#pakistan-map-svg [data-province-name="${mainFilterValue}"]`);
+                if (svgProvinceElement) {
+                    svgProvinceElement.classList.add('selected');
+                }
+            }
+            
+            updateAlerts();
+        }
+
+        // Animation for counter values (e.g., in KPIs)
+        function animateValue(obj, start, end, duration, isPercent = false, decimals = 0) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                // Handle decimals for percentages and other float values
+                const value = (isPercent || decimals > 0) ? (start + progress * (end - start)).toFixed(decimals) : Math.floor(start + progress * (end - start));
+                obj.innerHTML = value.toLocaleString() + (isPercent ? '%' : '');
+                if (progress < 1) window.requestAnimationFrame(step);
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // Update Key Performance Indicators (KPIs)
+        function updateKPIs(currentFilterProvince) {
+            const overallKpis = dashboardData.status_deck_data.overall_kpis;
+            const provincialRankings = dashboardData.status_deck_data.provincial_ranking;
+
+            let totalBeneficiaries = overallKpis.total_beneficiaries_trained;
+            let totalTrainings = overallKpis.total_trainings_conducted;
+            let overallBeneficiaryTarget = overallKpis.total_beneficiary_target;
+            let overallTrainingTarget = overallKpis.total_training_target;
+            let ruralBeneficiariesPct = overallKpis.rural_beneficiaries_pct;
+            let urbanBeneficiariesPct = overallKpis.urban_beneficiaries_pct;
+            let ruralTrainingsPct = overallKpis.rural_trainings_pct;
+            let urbanTrainingsPct = overallKpis.urban_trainings_pct;
+            let handbooksDistributed = overallKpis.handbooks_distributed; // Assuming actual count is available or derived
+            let handbooksDistributedPct = overallKpis.handbooks_distributed_pct;
+
+
+            if (currentFilterProvince !== 'All') {
+                const provinceData = provincialRankings.find(p => p.province === currentFilterProvince);
+                if (provinceData) {
+                    totalBeneficiaries = provinceData.total_trained;
+                    totalTrainings = provinceData.trainings_conducted;
+                    overallBeneficiaryTarget = provinceData.target_beneficiaries;
+                    overallTrainingTarget = provinceData.target_trainings;
+                    // For rural/urban splits and handbooks, if not available per province in JSON, use overall or fixed.
+                    // For prototype, let's keep overall percentages for R/U if not broken down by province in JSON.
+                    // Handbooks for province can be a percentage of provincial beneficiaries.
+                    handbooksDistributed = Math.round(provinceData.total_trained * (overallKpis.handbooks_distributed_pct / 100));
+                    handbooksDistributedPct = overallKpis.handbooks_distributed_pct; // Keep overall percentage for simplicity
+                }
+            }
+            
+            const beneficiariesTargetPct = overallBeneficiaryTarget > 0 ? ((totalBeneficiaries / overallBeneficiaryTarget) * 100) : 0;
+            const trainingsTargetPct = overallTrainingTarget > 0 ? ((totalTrainings / overallTrainingTarget) * 100) : 0;
+
+            animateValue(document.getElementById('totalBeneficiaries'), parseInt(document.getElementById('totalBeneficiaries').textContent.replace(/,/g, '') || '0'), totalBeneficiaries, 1000);
+            document.getElementById('beneficiariesTargetPct').textContent = `${beneficiariesTargetPct.toFixed(1)}% Target`;
+            document.getElementById('beneficiaryOverallTarget').textContent = overallBeneficiaryTarget.toLocaleString();
+            document.getElementById('ruralBeneficiariesPct').textContent = `${ruralBeneficiariesPct.toFixed(1)}%`; // Updated
+            document.getElementById('urbanBeneficiariesPct').textContent = `${urbanBeneficiariesPct.toFixed(1)}%`; // Updated
+
+            animateValue(document.getElementById('totalTrainings'), parseInt(document.getElementById('totalTrainings').textContent.replace(/,/g, '') || '0'), totalTrainings, 1000);
+            document.getElementById('trainingsTargetPct').textContent = `${trainingsTargetPct.toFixed(1)}% Target`;
+            document.getElementById('trainingOverallTarget').textContent = overallTrainingTarget.toLocaleString();
+            document.getElementById('ruralTrainingsPct').textContent = `${ruralTrainingsPct.toFixed(1)}%`; // Updated
+            document.getElementById('urbanTrainingsPct').textContent = `${urbanTrainingsPct.toFixed(1)}%`; // Updated
+
+            animateValue(document.getElementById('handbooksDistributed'), parseInt(document.getElementById('handbooksDistributed').textContent.replace(/,/g, '') || '0'), handbooksDistributed, 1000);
+            document.getElementById('handbooksTargetPct').textContent = `${handbooksDistributedPct.toFixed(1)}% Target Achieved`; // Updated
+            
+            // Top performing province is from overall KPIs, not filtered
+            document.getElementById('topProvinceName').textContent = overallKpis.top_province_name || 'N/A';
+            document.getElementById('topProvincePct').textContent = `${overallKpis.top_province_pct.toFixed(1)}% Target Achieved`;
+        }
+
+        // Update the map markers and heatmap based on filtered data
+        function updateMapAndHeatmap(data) {
+            markers.clearLayers(); // Clear existing markers
+            const heatPoints = [];
+            const maxBeneficiaryCount = Math.max(...data.map(item => item.total_beneficiaries_trained || 0), 1); // Get max for heatmap weight
+
+            data.forEach(item => {
+                const lat = parseFloat(item.latitude);
+                const lon = parseFloat(item.longitude);
+
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    const latLng = [lat, lon];
+                    heatPoints.push([...latLng, (item.total_beneficiaries_trained || 0) / maxBeneficiaryCount]); // Add weighted point for heatmap
+                    
+                    // Dynamic marker size based on beneficiary count
+                    const markerSize = 14 + ((item.total_beneficiaries_trained || 0) / maxBeneficiaryCount) * 20; 
+                    
+                    // Custom HTML marker with pulse animation
+                    const markerIcon = L.divIcon({
+                        html: `
+                            <div style="position: relative; display: flex; align-items: center; justify-content: center;">
+                                <div class="location-dot-pulse" style="width:${markerSize*1.5}px; height:${markerSize*1.5}px; background-color:${provinceColors[item.province] || '#4f46e5'}1A;"></div>
+                                <div class="location-dot" style="width:${markerSize}px; height:${markerSize}px; background-color:${provinceColors[item.province] || '#4f46e5'};">
+                                    <svg viewBox="0 0 24 24" fill="white" width="${markerSize*0.6}" height="${markerSize*0.6}">
+                                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/>
+                                    </svg>
+                                </div>
+                            </div>`,
+                        className: 'leaflet-div-icon',
+                        iconSize: [markerSize * 1.5, markerSize * 1.5], // Adjust icon size to include pulse
+                        iconAnchor: [markerSize * 0.75, markerSize * 0.75]
+                    });
+
+                    // Popup content for markers
+                    const popupContent = `
+                        <div style="font-family: 'Montserrat', sans-serif; color: #1f2937;">
+                            <div class="font-bold text-base mb-1">${item.aspc_name || 'N/A'}</div>
+                            <div class="text-xs text-gray-600 mb-2">Duty Station: ${item.duty_station || 'N/A'}</div>
+                            <div class="text-sm text-gray-700"><strong>Beneficiaries:</strong> <span class="text-indigo-600 font-bold">${item.total_beneficiaries_trained || 0}</span></div>
+                            <div class="text-sm text-gray-700"><strong>Target Achieved:</strong> <span class="${parseFloat(item.total_target_pct_achieved) >= 100 ? 'text-green-600' : 'text-orange-500'} font-bold">${item.total_target_pct_achieved || '0'}%</span></div>
+                            <div class="text-sm text-gray-700"><strong>Under IC:</strong> ${item.under_ic || 'N/A'}</div>
+                            <div class="text-sm text-gray-700"><strong>Total Trainings by Trainer:</strong> ${item.total_trainings_this_month || 'N/A'}</div>
+                            <div class="text-xs text-gray-500 mt-2">Date: ${item.training_date || 'N/A'} in ${item.district || 'N/A'}, ${item.province || 'N/A'}</div>
+                        </div>`;
+
+                    L.marker(latLng, { icon: markerIcon })
+                        .bindPopup(popupContent, { maxWidth: 250 })
+                        .addTo(markers);
+                }
+            });
+
+            heatLayer.setLatLngs(heatPoints); // Update heatmap data
+            // Adjust map view to fit markers if present, otherwise default view
+            if (markers.getLayers().length > 0) {
+                map.fitBounds(markers.getBounds().pad(0.1));
+            } else {
+                map.setView([30.3753, 69.3451], 5.5);
+            }
+        }
+        
+        // Counter animation for numerical values
+        const animateCounter = (counter) => {
+            const target = +counter.getAttribute('data-target');
+            const decimals = +counter.getAttribute('data-decimals') || 0;
+            const speed = 100; // Number of animation frames
+
+            const updateCount = () => {
+                const count = parseFloat(counter.innerText);
+                const increment = (target - count) / speed; // Calculate increment based on remaining distance
+                
+                if (Math.abs(target - count) > Math.abs(increment)) { // Continue if not very close to target
+                    const newCount = count + increment;
+                    counter.innerText = newCount.toFixed(decimals);
+                    requestAnimationFrame(updateCount);
+                } else {
+                    counter.innerText = target.toFixed(decimals); // Snap to target
+                }
+            };
+            requestAnimationFrame(updateCount);
+        };
+
+        // Observe elements for animation when they enter the viewport
+        const createAndObserveChartBlocks = () => {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+
+                        const countersInView = entry.target.querySelectorAll('.counter');
+                        countersInView.forEach(counter => {
+                            const targetValue = parseFloat(counter.getAttribute('data-target'));
+                            const decimals = parseInt(counter.getAttribute('data-decimals') || '0');
+                            animateValue(counter, 0, targetValue, 1000, false, decimals); // Re-animate counters
+                        });
+
+                        entry.target.querySelectorAll('.segment-custom').forEach(segment => {
+                            // Trigger reflow to restart CSS animation
+                            segment.style.width = '0';
+                            void segment.offsetWidth;  // Trigger reflow
+                            segment.style.setProperty('--width', segment.dataset.width);
+                        });
+
+                        observer.unobserve(entry.target); // Stop observing once animated
+                    }
+                });
+            }, { threshold: 0.5 }); // Trigger when 50% of the element is visible
+
+            document.querySelectorAll('#provincialSummaryContent .chart-block-custom').forEach(block => {
+                block.style.opacity = '0'; // Initial state for re-animation on re-render
+                block.style.transform = 'translateY(30px)';
+                observer.observe(block);
+            });
+
+            // Also trigger for elements already in viewport on load
+            document.querySelectorAll('#provincialSummaryContent .chart-block-custom').forEach(block => {
+                const rect = block.getBoundingClientRect();
+                const isInViewport = (
+                    rect.top >= 0 &&
+                    rect.left >= 0 &&
+                    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+                    rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+                );
+                if (isInViewport) {
+                    block.style.opacity = '1';
+                    block.style.transform = 'translateY(0)';
+                    block.querySelectorAll('.counter').forEach(counter => {
+                        const targetValue = parseFloat(counter.getAttribute('data-target'));
+                        const decimals = parseInt(counter.getAttribute('data-decimals') || '0');
+                        animateValue(counter, 0, targetValue, 1000, false, decimals);
+                    });
+                    block.querySelectorAll('.segment-custom').forEach(segment => {
+                        segment.style.width = '0';
+                        void segment.offsetWidth;
+                        segment.style.setProperty('--width', segment.dataset.width);
+                    });
+                }
+            });
+        };
+
+        // Update the content of the Provincial Summary card
+        function updateProvincialSummaryContent(selectedProvinceName) {
+            const provincialSummaryContent = document.getElementById('provincialSummaryContent');
+            const provincialSummaryTitle = document.getElementById('provincialSummaryTitle');
+            const performanceKpis = dashboardData.status_deck_data.performance_overviews_kpis;
+
+            provincialSummaryTitle.textContent = `Performance Overview & KPIs for ${selectedProvinceName}`;
+
+            // Filter data for the selected province for specific KPIs
+            const provinceData = dashboardData.status_deck_data.provincial_ranking.find(p => p.province === selectedProvinceName);
+            
+            if (!provinceData || selectedProvinceName === 'Select Province') {
+                provincialSummaryContent.innerHTML = `<p class="text-gray-500 text-sm text-center">Select a province to view its performance details.</p>`;
+                provincialSummaryTitle.textContent = `Provincial Performance Overview`;
+                return;
+            }
+
+            // Use overall KPIs for now, as per JSON structure. If per-province breakdown is needed, data generator needs update.
+            const cnicData = performanceKpis.cnic_verification;
+            const ageData = performanceKpis.age_demographics;
+            const avgTrainingTime = performanceKpis.avg_training_time_hours;
+            const avgEngagementRate = performanceKpis.avg_engagement_rate_pct;
+            const avgRetentionRate = performanceKpis.avg_retention_rate_pct;
+            const educationData = performanceKpis.education_graphics;
+
+            // Dynamically generate education chart segments
+            let educationSegmentsHtml = '';
+            const educationColors = ['#4f46e5', '#2dd4bf', '#fbbf24', '#ef4444', '#60a5fa', '#a855f7', '#06b6d4', '#f472b6']; // Example colors
+            let eduIndex = 0;
+            for (const key in educationData) {
+                const label = key.replace(/_/g, ' ').replace('pct', '').trim();
+                const percentage = educationData[key];
+                educationSegmentsHtml += `
+                    <div class="segment-custom" style="--width: ${percentage}%; background-color: ${educationColors[eduIndex % educationColors.length]}; --delay: 0.6s;" 
+                        data-tooltip="${label}: ${percentage.toFixed(1)}%" data-width="${percentage}%">
+                    </div>`;
+                eduIndex++;
+            }
+            let educationLegendHtml = '';
+            eduIndex = 0;
+            for (const key in educationData) {
+                const label = key.replace(/_/g, ' ').replace('pct', '').trim();
+                educationLegendHtml += `
+                    <span class="legend-item-custom" style="--color: ${educationColors[eduIndex % educationColors.length]}">${label}</span>`;
+                eduIndex++;
+            }
+
+
+            // Inject dynamic HTML content for the provincial summary card
+            provincialSummaryContent.innerHTML = `
+                <div class="chart-block-custom" style="animation-delay: 0.1s;">
+                    <div class="chart-header-custom">
+                        <h3>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 012-2h4a2 2 0 012 2v1m-6.938 4.063A1.063 1.063 0 0112 11a1.063 1.063 0 01-1.063-1.063A1.063 1.063 0 0112 8.875a1.063 1.063 0 011.063 1.063z"></path></svg>
+                            CNIC Verification
+                        </h3>
+                        <div class="value-label-custom"><span class="counter" data-target="${cnicData.valid_pct.toFixed(0)}">0</span>% Valid</div>
+                    </div>
+                    <div class="bar-wrapper-custom">
+                        <div class="bar-custom">
+                            <div class="segment-custom valid" style="--width: ${cnicData.valid_pct}%; --delay: 0.5s;" data-tooltip="Valid: ${cnicData.valid_count.toLocaleString()} (${cnicData.valid_pct.toFixed(1)}%)" data-width="${cnicData.valid_pct}%"></div>
+                            <div class="segment-custom fake" style="--width: ${cnicData.fake_pct}%; --delay: 0.5s;" data-tooltip="Fake: ${cnicData.fake_count.toLocaleString()} (${cnicData.fake_pct.toFixed(1)}%)" data-width="${cnicData.fake_pct}%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-block-custom" style="animation-delay: 0.2s;">
+                    <div class="chart-header-custom">
+                        <h3>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                            Age Demographics
+                        </h3>
+                    </div>
+                    <div class="bar-wrapper-custom">
+                        <div class="bar-custom">
+                            <div class="segment-custom age-1" style="--width: ${ageData['20-25_pct']}%; --delay: 0.6s;" data-tooltip="20-25: ${ageData['20-25_pct'].toFixed(1)}%" data-width="${ageData['20-25_pct']}%"></div>
+                            <div class="segment-custom age-2" style="--width: ${ageData['26-35_pct']}%; --delay: 0.6s;" data-tooltip="26-35: ${ageData['26-35_pct'].toFixed(1)}%" data-width="${ageData['26-35_pct']}%"></div>
+                            <div class="segment-custom age-3" style="--width: ${ageData['36-45_pct']}%; --delay: 0.6s;" data-tooltip="36-45: ${ageData['36-45_pct'].toFixed(1)}%" data-width="${ageData['36-45_pct']}%"></div>
+                            <div class="segment-custom age-4" style="--width: ${ageData['45+_pct']}%; --delay: 0.6s;" data-tooltip="45+: ${ageData['45+_pct'].toFixed(1)}%" data-width="${ageData['45+_pct']}%"></div>
+                        </div>
+                    </div>
+                    <div class="legend-custom">
+                        <span class="legend-item-custom" style="--color: var(--c-age1)">20-25</span>
+                        <span class="legend-item-custom" style="--color: var(--c-age2)">26-35</span>
+                        <span class="legend-item-custom" style="--color: var(--c-age3)">36-45</span>
+                        <span class="legend-item-custom" style="--color: var(--c-age4)">45+</span>
+                    </div>
+                </div>
+                
+                <div class="chart-block-custom" style="animation-delay: 0.3s;">
+                    <div class="chart-header-custom">
+                        <h3>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
+                            Performance Metrics
+                        </h3>
+                    </div>
+                    <div class="metric-group-custom">
+                        <div class="chart-header-custom" style="margin-bottom: 0.75rem; padding-left: 0.5rem;">
+                            <h4 style="margin:0; font-weight: 500; color: var(--text-secondary);">Avg. Training Time</h4>
+                            <div class="value-label-custom"><span class="counter" data-target="${avgTrainingTime.toFixed(1)}" data-decimals="1">0.0</span> / ${AVERAGE_CLASSROOM_HOURS_PER_DAY.toFixed(1)} hrs</div>
+                        </div>
+                        <div class="bar-wrapper-custom" style="margin-bottom: 1.5rem; margin-left: 0.5rem;">
+                            <div class="bar-custom">
+                                <div class="segment-custom training" style="--width: ${Math.min(100, (avgTrainingTime / AVERAGE_CLASSROOM_HOURS_PER_DAY) * 100)}%; --delay: 0.7s;" data-tooltip="${avgTrainingTime.toFixed(1)} / ${AVERAGE_CLASSROOM_HOURS_PER_DAY.toFixed(1)} hrs" data-width="${Math.min(100, (avgTrainingTime / AVERAGE_CLASSROOM_HOURS_PER_DAY) * 100)}%"></div>
+                            </div>
+                        </div>
+                        <div class="chart-header-custom" style="margin-bottom: 0.75rem; padding-left: 0.5rem;">
+                            <h4 style="margin:0; font-weight: 500; color: var(--text-secondary);">Avg. Engagement Rate</h4>
+                            <div class="value-label-custom"><span class="counter" data-target="${avgEngagementRate.toFixed(0)}">0</span>%</div>
+                        </div>
+                        <div class="bar-wrapper-custom" style="margin-left: 0.5rem;">
+                            <div class="bar-custom">
+                                <div class="segment-custom handbooks" style="--width: ${avgEngagementRate.toFixed(1)}%; --delay: 0.8s;" data-tooltip="${avgEngagementRate.toFixed(1)}% Engagement" data-width="${avgEngagementRate.toFixed(1)}%"></div>
+                            </div>
+                        </div>
+                        <div class="chart-header-custom" style="margin-bottom: 0.75rem; padding-left: 0.5rem;">
+                            <h4 style="margin:0; font-weight: 500; color: var(--text-secondary);">Avg. Retention Rate</h4>
+                            <div class="value-label-custom"><span class="counter" data-target="${avgRetentionRate.toFixed(0)}">0</span>%</div>
+                        </div>
+                        <div class="bar-wrapper-custom" style="margin-left: 0.5rem;">
+                            <div class="bar-custom">
+                                <div class="segment-custom handbooks" style="--width: ${avgRetentionRate.toFixed(1)}%; --delay: 0.9s;" data-tooltip="${avgRetentionRate.toFixed(1)}% Retention" data-width="${avgRetentionRate.toFixed(1)}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-block-custom" style="animation-delay: 0.4s;">
+                    <div class="chart-header-custom">
+                        <h3>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.205 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.523 5.795 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.795 5 16.5 5s3.332.477 4.5 1.253v13C19.832 18.523 18.205 18 16.5 18s-3.332.477-4.5 1.253"></path></svg>
+                            Education Demographics
+                        </h3>
+                    </div>
+                    <div class="bar-wrapper-custom">
+                        <div class="bar-custom">
+                            ${educationSegmentsHtml}
+                        </div>
+                    </div>
+                    <div class="legend-custom">
+                        ${educationLegendHtml}
+                    </div>
+                </div>
+            `;
+
+            createAndObserveChartBlocks(); // Trigger animations for newly injected blocks
+        }
+
+        // Update the Monthly Trend Chart (using Chart.js)
+        function updateMonthlyTrendChart(unit = 'month', metric = 'beneficiaries') {
+            const trendData = dashboardData.status_deck_data.beneficiaries_trend;
+            const dataToUse = (unit === 'day') ? trendData.daily : trendData.monthly;
+            
+            // Filter by province if a specific province is selected in the main filter
+            const mainFilterValue = document.getElementById('provinceFilter').value;
+            let filteredAggregatedData = {};
+
+            if (mainFilterValue === 'All') {
+                // Use the pre-aggregated data directly if no province filter
+                for (const item of dataToUse) {
+                    filteredAggregatedData[item.date] = item[metric] || 0;
+                }
+            } else {
+                // If a province is selected, we need to re-aggregate from raw trainings_raw data
+                // Note: The provided JSON only has map_data which is a subset of trainings_raw.
+                // For accurate per-province trend, the Python script would need to provide
+                // per-province monthly/daily beneficiary/account data.
+                // For now, we'll filter the overall trend data by province. This is a simplification.
+                const relevantTrainings = dashboardData.status_deck_data.map_data.filter(t => t.province === mainFilterValue);
+                // We need to get the actual beneficiary data linked to these trainings for accurate counts.
+                // Since beneficiaries_raw is not in the JSON, we will simulate this or use a proxy.
+                // For this prototype, we'll just scale the overall trend by a factor if a province is selected.
+                // In a real system, you'd join `trainings_raw` and `beneficiaries_raw` from the backend.
+                
+                // Placeholder: Scale overall trend data for the selected province
+                const scaleFactor = (dashboardData.status_deck_data.provincial_ranking.find(p => p.province === mainFilterValue)?.total_trained || 1) / dashboardData.status_deck_data.overall_kpis.total_beneficiaries_trained;
+
+                for (const item of dataToUse) {
+                    filteredAggregatedData[item.date] = (item[metric] || 0) * scaleFactor;
+                }
+            }
+
+
+            const sortedKeys = Object.keys(filteredAggregatedData).sort();
+            const labels = sortedKeys.map(key => new Date(key));
+            const values = sortedKeys.map(key => filteredAggregatedData[key]);
+
+            // Calculate target based on the filtered data's total beneficiaries
+            const totalFilteredBeneficiaries = values.reduce((sum, val) => sum + val, 0);
+            let currentTargetValue = 0;
+            if (mainFilterValue === 'All') {
+                currentTargetValue = globalTargets.totalBeneficiaryTarget / 8; // Assuming 8 months target distribution
+            } else {
+                const provinceTarget = globalTargets.provinces[mainFilterValue] ? globalTargets.provinces[mainFilterValue].target_beneficiaries : 0;
+                currentTargetValue = provinceTarget / 8; // Assuming 8 months for province target
+            }
+            if (unit === 'day') {
+                currentTargetValue = currentTargetValue / 30.4; // Rough daily average
+            }
+            
+
+            monthlyTrendChart.data.labels = labels;
+            monthlyTrendChart.data.datasets[0].data = values.map((val, idx) => ({x: labels[idx], y: val}));
+            monthlyTrendChart.data.datasets[0].label = `${metric.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} per ${unit}`;
+            monthlyTrendChart.options.scales.x.time.unit = unit;
+            if (monthlyTrendChart.options.plugins.annotation.annotations.targetLine) {
+                monthlyTrendChart.options.plugins.annotation.annotations.targetLine.value = currentTargetValue;
+                monthlyTrendChart.options.plugins.annotation.annotations.targetLine.label.content = `Target: ${currentTargetValue.toFixed(0)}`;
+            }
+            monthlyTrendChart.update();
+        }
+
+        // Update the Provincial Ranking table
+        function updateProvincialRanking() {
+            const activeSortButton = document.querySelector('.provincial-ranking-card .flex.gap-2 .chart-filter-button.active');
+            const sortMetric = activeSortButton ? activeSortButton.dataset.sortMetric : 'total_trained';
+
+            let sortedProvinces = [...dashboardData.status_deck_data.provincial_ranking];
+            
+            // Apply main province filter if active
+            const mainFilterValue = document.getElementById('provinceFilter').value;
+            if (mainFilterValue !== 'All') {
+                sortedProvinces = sortedProvinces.filter(p => p.province === mainFilterValue);
+            }
+
+            if (sortMetric === 'total_trained') {
+                sortedProvinces.sort((a, b) => b.total_trained - a.total_trained);
+            } else if (sortMetric === 'trainings_conducted') {
+                sortedProvinces.sort((a, b) => b.trainings_conducted - a.trainings_conducted);
+            } else if (sortMetric === 'pct_achieved_beneficiaries') {
+                sortedProvinces.sort((a, b) => b.pct_achieved_beneficiaries - a.pct_achieved_beneficiaries);
+            }
+
+
+            const tableBody = document.getElementById('provincialRankingTableBody');
+            tableBody.innerHTML = ''; // Clear existing rows
+            if (sortedProvinces.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="5" class="px-4 py-2 text-center text-gray-500">No provincial data.</td></tr>`;
+            } else {
+                sortedProvinces.forEach((item, index) => {
+                    const targetPercentColor = item.pct_achieved_beneficiaries >= 100 ? 'bg-green-500' : (item.pct_achieved_beneficiaries >= 75 ? 'bg-yellow-500' : 'bg-red-500');
+                    tableBody.innerHTML += `
+                        <tr class="border-b border-gray-200">
+                            <td class="px-4 py-2 font-medium text-gray-800">${index + 1}</td>
+                            <td class="px-4 py-2 text-gray-700">${item.province}</td>
+                            <td class="px-4 py-2 text-gray-700">${item.total_trained.toLocaleString()}</td>
+                            <td class="px-4 py-2 text-gray-700">${item.trainings_conducted.toLocaleString()}</td>
+                            <td class="px-4 py-2 text-gray-700">
+                                <div class="w-full bg-gray-300 rounded-full h-2.5">
+                                    <div class="${targetPercentColor} h-2.5 rounded-full" style="width: ${Math.min(100, item.pct_achieved_beneficiaries)}%"></div>
+                                </div>
+                                <span class="text-xs text-gray-600">${item.pct_achieved_beneficiaries.toFixed(1)}%</span>
+                            </td>
+                        </tr>`;
+                });
+            }
+        }
+
+        // Update the Top Trainers Leaderboard
+        function updateLeaderboard() {
+            const activeSortButton = document.querySelector('.leaderboard-card .flex.gap-2 .chart-filter-button.active');
+            const sortMetric = activeSortButton ? activeSortButton.dataset.sortMetric : 'total_trained';
+
+            let sortedTrainers = [...dashboardData.status_deck_data.top_trainers_ranking];
+
+            // Apply main province filter if active
+            const mainFilterValue = document.getElementById('provinceFilter').value;
+            if (mainFilterValue !== 'All') {
+                // Filter trainers who belong to this province (assuming trainer_name in map_data has province info)
+                const trainersInProvince = dashboardData.status_deck_data.map_data
+                                            .filter(d => d.province === mainFilterValue)
+                                            .map(d => d.aspc_name);
+                sortedTrainers = sortedTrainers.filter(trainer => trainersInProvince.includes(trainer.trainer_name));
+            }
+
+            if (sortMetric === 'total_trained') {
+                sortedTrainers.sort((a, b) => b.total_trained - a.total_trained);
+            } else if (sortMetric === 'qa_rating') {
+                sortedTrainers.sort((a, b) => b.qa_rating - a.qa_rating);
+            }
+
+            const tableBody = document.getElementById('leaderboardTableBody');
+            tableBody.innerHTML = ''; // Clear existing rows
+            if (sortedTrainers.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="5" class="px-4 py-2 text-center text-gray-500">No trainer data this month for selected filters.</td></tr>`;
+            } else {
+                sortedTrainers.slice(0, 5).forEach((item, index) => { // Display top 5
+                    const targetPercentColor = item.pct_achieved >= 100 ? 'bg-green-500' : (item.pct_achieved >= 75 ? 'bg-yellow-500' : 'bg-red-500');
+                    tableBody.innerHTML += `
+                        <tr class="border-b border-gray-200">
+                            <td class="px-4 py-2 font-medium text-gray-800">${index + 1}</td>
+                            <td class="px-4 py-2 text-gray-700">${item.trainer_name}</td>
+                            <td class="px-4 py-2 text-gray-700">${item.total_trained.toLocaleString()}</td>
+                            <td class="px-4 py-2 text-gray-700">
+                                <div class="w-full bg-gray-300 rounded-full h-2.5">
+                                    <div class="${targetPercentColor} h-2.5 rounded-full" style="width: ${Math.min(100, item.pct_achieved)}%"></div>
+                                </div>
+                                <span class="text-xs text-gray-600">${item.pct_achieved.toFixed(1)}%</span>
+                            </td>
+                            <td class="px-4 py-2 text-gray-700">${item.qa_rating.toFixed(1)}</td>
+                        </tr>`;
+                });
+            }
+        }
+
+        // Update the Operational Alerts section
+        function updateAlerts() {
+            const alertsList = document.querySelector('.leaflet-control-alerts-overlay #alertsList');
+            const alertsOverlayDiv = document.querySelector('.leaflet-control-alerts-overlay');
+
+            // Small delay to ensure the DOM element is rendered if called very early
+            if (!alertsList || !alertsOverlayDiv) {
+                setTimeout(() => updateAlerts(), 100);
+                return;
+            }
+
+            // Using mock alerts for now as system_alerts in JSON is empty.
+            // In a real scenario, these would come from dashboardData.status_deck_data.system_alerts.
+            const mockAlerts = [
+                { type: 'low-attendance', message: `<p class="font-bold text-red-700 text-xs">Trainer A in Lahore</p><p class="text-xs text-gray-600">Low attendance (12) on 2025-07-20.</p>`, className: 'bg-red-100 border border-red-300 rounded-lg' },
+                { type: 'late-report', message: `<p class="font-bold text-yellow-700 text-xs">Trainer B</p><p class="text-xs text-gray-600">No report in 5 days (last training: 2025-07-18).</p>`, className: 'bg-yellow-100 border border-yellow-300 rounded-lg' },
+                { type: 'high-fake-cnic', message: `<p class="font-bold text-orange-700 text-xs">Trainer C in Karachi</p><p class="text-xs text-gray-600">High fake CNIC count (5) on 2025-07-22.</p>`, className: 'bg-orange-100 border border-orange-300 rounded-lg' },
+                { type: 'low-session-target', message: `<p class="font-bold text-purple-700 text-xs">Trainer D in Multan</p><p class="text-xs text-gray-600">Low session target achievement (45%) on 2025-07-19.</p>`, className: 'bg-purple-100 border border-purple-300 rounded-lg' }
+            ];
+
+            alertsList.innerHTML = ''; // Clear existing alerts
+            
+            if (mockAlerts.length === 0) { // Check mockAlerts for prototype
+                alertsList.innerHTML = `<li class="p-2 text-center text-gray-500">No system alerts.</li>`;
+                alertsOverlayDiv.style.display = 'none'; // Hide overlay if no alerts
+            } else {
+                mockAlerts.forEach(alert => {
+                    alertsList.innerHTML += `<li class="${alert.className}">${alert.message}</li>`;
+                });
+                alertsOverlayDiv.style.display = 'flex'; // Show overlay if alerts exist
+            }
+        }
+    </script>
+</body>
+</html>

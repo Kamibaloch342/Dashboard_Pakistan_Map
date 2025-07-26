@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trainings Conducted Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: #f5f5f5;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .glass-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+        }
+        .progress-bar {
+            transition: width 2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .number-animate {
+            font-family: 'Montserrat', sans-serif;
+            color: #d32f2f;
+            text-shadow: 0 0 5px rgba(211, 47, 47, 0.3);
+        }
+        .progress-container:hover .progress-bar {
+            box-shadow: 0 0 10px rgba(211, 47, 47, 0.4);
+        }
+        .glow-text {
+            font-family: 'Montserrat', sans-serif;
+            color: #1a1a1a;
+            transition: color 0.3s ease;
+        }
+        .glow-text:hover {
+            color: #d32f2f;
+        }
+        .text-secondary {
+            font-family: 'Montserrat', sans-serif;
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+    <div class="glass-card rounded-2xl p-8 w-full max-w-md relative overflow-hidden">
+        <!-- Total Trainings Conducted Section -->
+        <div class="mb-10 relative z-10">
+            <h2 class="text-2xl font-bold glow-text mb-5">Total Trainings Conducted</h2>
+            <div class="flex items-center justify-between mb-4">
+                <div class="text-4xl font-extrabold number-animate" id="totalTrainings">0</div>
+                <div class="text-base text-secondary font-medium">Target: <span id="targetTrainings">0</span></div>
+            </div>
+            <div class="progress-container w-full bg-gray-100 rounded-full h-4 overflow-hidden">
+                <div id="totalProgress" class="bg-red-600 h-4 rounded-full progress-bar" style="width: 0%"></div>
+            </div>
+            <div class="text-sm text-secondary mt-3 font-medium">Progress: <span id="totalPercentage">0.0%</span></div>
+        </div>
+
+        <!-- Rural and Urban Breakdown -->
+        <div class="grid grid-cols-2 gap-6 relative z-10">
+            <!-- Rural -->
+            <div class="progress-container">
+                <h3 class="text-lg font-semibold glow-text mb-3">Rural</h3>
+                <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div id="ruralProgress" class="bg-red-500 h-2 rounded-full progress-bar" style="width: 0%"></div>
+                </div>
+                <div class="text-sm text-secondary mt-2 font-medium">Progress: <span id="ruralPercentage">0%</span></div>
+            </div>
+            <!-- Urban -->
+            <div class="progress-container">
+                <h3 class="text-lg font-semibold glow-text mb-3">Urban</h3>
+                <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div id="urbanProgress" class="bg-blue-600 h-2 rounded-full progress-bar" style="width: 0%"></div>
+                </div>
+                <div class="text-sm text-secondary mt-2 font-medium">Progress: <span id="urbanPercentage">0%</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Function to generate random data
+        function generateRandomData() {
+            const totalTrainings = Math.floor(Math.random() * 5000) + 1000; // Random between 1000 and 6000
+            const targetTrainings = Math.floor(Math.random() * 5000) + 5000; // Random between 5000 and 10000
+            const totalPercentage = ((totalTrainings / targetTrainings) * 100).toFixed(1);
+            const ruralPercentage = Math.floor(Math.random() * 80) + 20; // Random between 20% and 100%
+            const urbanPercentage = Math.floor(Math.random() * (100 - ruralPercentage)) + 10; // Random between 10% and (100 - ruralPercentage)
+
+            return {
+                totalTrainings,
+                targetTrainings,
+                totalPercentage,
+                ruralPercentage,
+                urbanPercentage
+            };
+        }
+
+        // Function to animate numbers
+        function animateNumber(elementId, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const value = Math.floor(progress * (end - start) + start);
+                document.getElementById(elementId).textContent = value.toLocaleString();
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // Function to animate progress bars
+        function animateProgressBar(elementId, percentage) {
+            gsap.to(`#${elementId}`, {
+                width: `${percentage}%`,
+                duration: 2,
+                ease: "power2.out"
+            });
+        }
+
+        // Generate random data
+        const data = generateRandomData();
+
+        // Animate numbers and progress bars on load
+        document.addEventListener("DOMContentLoaded", () => {
+            animateNumber("totalTrainings", 0, data.totalTrainings, 2500);
+            document.getElementById("targetTrainings").textContent = data.targetTrainings.toLocaleString();
+            document.getElementById("totalPercentage").textContent = `${data.totalPercentage}%`;
+            animateProgressBar("totalProgress", data.totalPercentage);
+            document.getElementById("ruralPercentage").textContent = `${data.ruralPercentage}%`;
+            animateProgressBar("ruralProgress", data.ruralPercentage);
+            document.getElementById("urbanPercentage").textContent = `${data.urbanPercentage}%`;
+            animateProgressBar("urbanProgress", data.urbanPercentage);
+
+            // Card entrance animation
+            gsap.from(".glass-card", {
+                opacity: 0,
+                y: 50,
+                duration: 1,
+                ease: "power2.out"
+            });
+
+            // Staggered animation for sections
+            gsap.from(".progress-container, h2, .number-animate", {
+                opacity: 0,
+                y: 15,
+                duration: 0.8,
+                stagger: 0.15,
+                delay: 0.3,
+                ease: "power2.out"
+            });
+        });
+    </script>
+</body>
+</html>

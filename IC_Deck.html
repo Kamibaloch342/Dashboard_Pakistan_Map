@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DFLT Phase 2 - IC Operations Dashboard</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* Custom CSS Variables */
+        :root {
+            --bg-color: #f5f7fa; /* Light grey-blue background */
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --text-primary: #1a202c; /* Darker text */
+            --text-secondary: #4a5568;
+            --accent-main: #4c51bf; /* Deeper indigo */
+            --accent-light: #667eea;
+            --accent-success: #38a169;
+            --accent-warning: #ecc94b;
+            --accent-danger: #e53e3e;
+            --chart-grid-color: #ebf0f5;
+            --shadow-subtle: 0 2px 8px rgba(0,0,0,0.05);
+            --shadow-hover: 0 8px 20px rgba(0,0,0,0.1);
+        }
+
+        /* Base styles for body and font */
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            overflow: hidden; /* Prevent scroll for initial layout */
+            line-height: 1.5;
+        }
+
+        /* Dashboard Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-template-rows: 60px repeat(10, minmax(0, 1fr));
+            gap: 1.5rem; /* Increased gap for cleaner look */
+            height: 100vh;
+            padding: 1.5rem;
+            box-sizing: border-box;
+        }
+
+        /* Card Styling */
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 1.25rem; /* More pronounced rounded corners */
+            border: 1px solid var(--border-color);
+            padding: 1.75rem; /* Increased padding */
+            box-shadow: var(--shadow-subtle);
+            display: flex;
+            flex-direction: column;
+            animation: fadeInSlideUp 0.7s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease-in-out;
+            min-height: 0;
+            overflow: hidden; /* Ensures content doesn't spill out during animations */
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-hover);
+            transform: translateY(0px) scale(1.005);
+        }
+
+        /* Animations */
+        @keyframes fadeInSlideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0px); }
+        }
+
+        /* Staggered animation delays for cards */
+        .header { animation-delay: 0s; }
+        .overall-summary-card { animation-delay: 0.1s; }
+        .team-performance-ranking-card { animation-delay: 0.2s; }
+        .attendance-compliance-card { animation-delay: 0.3s; }
+        .bottleneck-identification-card { animation-delay: 0.4s; }
+        .training-type-distribution-card { animation-delay: 0.5s; }
+        .recent-field-updates-card { animation-delay: 0.6s; } /* Adjusted delay */
+        .trainer-activity-map-card { animation-delay: 0.7s; } /* Adjusted delay */
+
+
+        /* Specific Grid Placements for IC Deck (Revised for better fit) */
+        .header {
+            grid-column: 1 / -1;
+            grid-row: 1;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .overall-summary-card {
+            grid-column: 1 / 7; /* Spans 6 columns */
+            grid-row: 2 / 5; /* Spans 3 rows */
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* Inner grid for KPIs */
+            gap: 1.25rem;
+            padding: 1.5rem; /* Adjusted for inner grid */
+        }
+        .team-performance-ranking-card {
+            grid-column: 7 / -1; /* Spans 6 columns */
+            grid-row: 2 / 7; /* Spans 5 rows (more height for table) */
+            overflow-y: hidden;
+        }
+        .attendance-compliance-card {
+            grid-column: 1 / 4; /* Spans 3 columns */
+            grid-row: 5 / 8; /* Spans 3 rows */
+        }
+        .bottleneck-identification-card {
+            grid-column: 4 / 7; /* Spans 3 columns */
+            grid-row: 5 / 8;
+        }
+        .training-type-distribution-card {
+            grid-column: 1 / 5; /* Spans 4 columns */
+            grid-row: 8 / -1; /* Spans 4 rows to the end */
+        }
+        .recent-field-updates-card {
+            grid-column: 5 / 9; /* Spans 4 columns */
+            grid-row: 8 / -1; /* Spans 4 rows to the end */
+        }
+        .trainer-activity-map-card {
+            grid-column: 9 / -1; /* Spans 4 columns */
+            grid-row: 7 / -1; /* Spans 5 rows (aligns with the bottom two rows on the left) */
+        }
+
+
+        /* KPI Item styles */
+        .kpi-item {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background-color: #fcfdfe; /* Lighter background for KPIs */
+            border: 1px solid #eef3f8;
+            border-radius: 1rem;
+            padding: 1.25rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .kpi-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.08);
+        }
+        .kpi-item .value {
+            font-size: 2.8rem;
+            font-weight: 900;
+            line-height: 1;
+            color: var(--accent-main);
+            margin-bottom: 0.25rem;
+        }
+        .kpi-item .label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+        .kpi-item .comparison {
+            font-size: 0.75rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.2rem;
+        }
+        .kpi-item .comparison.positive { color: var(--accent-success); }
+        .kpi-item .comparison.negative { color: var(--accent-danger); }
+
+        /* Chart container base styles */
+        .chart-container {
+            flex-grow: 1;
+            position: relative;
+            min-height: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding-top: 1rem; /* Space for chart labels */
+        }
+        .chart-container canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Table specific styles for rankings */
+        .table-scroll-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            min-height: 0;
+            padding-right: 0.5rem;
+        }
+        .table-scroll-container::-webkit-scrollbar { width: 8px; }
+        .table-scroll-container::-webkit-scrollbar-track { background: var(--bg-color); border-radius: 10px; }
+        .table-scroll-container::-webkit-scrollbar-thumb { background-color: #cdd8e4; border-radius: 10px; border: 2px solid var(--bg-color); }
+        .table-scroll-container::-webkit-scrollbar-thumb:hover { background-color: #9ea9b8; }
+
+        table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        thead { background-color: #fbfdff; position: sticky; top: 0; z-index: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        th, td { padding: 0.9rem 1.2rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; }
+        td { font-size: 0.9rem; color: var(--text-primary); }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr.alert-row { background-color: #fee2e2; } /* Highlight for underperforming trainers */
+        tbody tr.alert-row:hover { background-color: #fecaca; }
+
+        /* Progress Bar in tables */
+        .progress-bar-container {
+            width: 100%;
+            background-color: var(--border-color);
+            border-radius: 9999px;
+            height: 10px; /* Slightly taller */
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            border-radius: 9999px;
+            width: 0%; /* Initial state for animation */
+            transition: width 1.2s cubic-bezier(0.23, 1, 0.32, 1); /* Smooth animation */
+        }
+        .progress-bar.success { background-color: var(--accent-success); }
+        .progress-bar.warning { background-color: var(--accent-warning); }
+        .progress-bar.danger { background-color: var(--accent-danger); }
+
+        /* Status indicators */
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.4rem;
+        }
+        .status-dot.active { background-color: var(--accent-success); }
+        .status-dot.inactive { background-color: var(--accent-danger); }
+        .status-dot.pending { background-color: var(--accent-warning); }
+
+        /* Recent Field Updates - List Items */
+        .updates-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .update-item {
+            background-color: #fcfdfe;
+            border: 1px solid #eef3f8;
+            border-radius: 0.75rem;
+            padding: 1rem 1.25rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.9rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            transition: all 0.2s ease-in-out;
+            animation: slideInLeft 0.7s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            opacity: 0;
+            transform: translateX(-10px);
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
+        }
+        .update-item:hover {
+            transform: translateX(0px) scale(1.01);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .update-item .icon {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            color: var(--accent-main);
+        }
+        .update-item .content strong { color: var(--accent-main); }
+        .update-item .content .date { font-size: 0.75rem; color: var(--text-secondary); opacity: 0.8; }
+        .update-item:nth-child(even) { animation-delay: 0.05s; }
+        .update-item:nth-child(odd) { animation-delay: 0.1s; }
+        .update-item:nth-child(3n) { animation-delay: 0.15s; }
+        .update-item:nth-child(4n) { animation-delay: 0.2s; }
+
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0px); }
+        }
+
+        /* Map specific styles */
+        #icMap {
+            height: 100%;
+            width: 100%;
+            border-radius: 1rem;
+            z-index: 0;
+        }
+        .leaflet-pane .leaflet-marker-icon {
+            transition: transform 0.2s ease-out; /* Smooth marker movement */
+        }
+        .leaflet-popup-content-wrapper {
+            background-color: #fff;
+            color: var(--text-primary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            font-family: 'Montserrat', sans-serif !important;
+        }
+        .leaflet-popup-tip { background-color: #fff; }
+        .leaflet-popup-content-wrapper * { font-family: 'Montserrat', sans-serif !important; color: var(--text-primary); }
+
+        .trainer-marker-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--accent-main);
+            color: white;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 0.8rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            border: 2px solid white;
+            transition: all 0.2s ease;
+        }
+        .trainer-marker-icon:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .trainer-marker-icon.active { background-color: var(--accent-success); }
+        .trainer-marker-icon.low-activity { background-color: var(--accent-warning); }
+        .trainer-marker-icon.critical { background-color: var(--accent-danger); }
+    </style>
+</head>
+<body>
+    <div class="dashboard-grid">
+        <header class="card header flex flex-row items-center justify-between !py-2">
+            <div class="flex items-center gap-4">
+                <img src="https://www.sdpi.org/assets/images/sdpi-logo-2020.webp" alt="SDPI Logo" class="h-10">
+                <h1 class="text-xl font-extrabold text-gray-900 text-gradient-blue-purple">IC Operations Dashboard</h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <label for="icFilter" class="text-xs font-medium text-gray-600">My Coordinator ID:</label>
+                    <select id="icFilter" class="block py-1 px-2 border border-gray-300 bg-gray-50 text-gray-900 rounded-md shadow-sm focus:outline-none focus:ring-accent-main focus:border-accent-main text-xs" onchange="updateDashboard()">
+                        <option value="IC-All">All ICs</option>
+                        </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="provinceFilter" class="text-xs font-medium text-gray-600">Province:</label>
+                    <select id="provinceFilter" class="block py-1 px-2 border border-gray-300 bg-gray-50 text-gray-900 rounded-md shadow-sm focus:outline-none focus:ring-accent-main focus:border-accent-main text-xs" onchange="updateDashboard()">
+                        <option value="All">All</option>
+                        </select>
+                </div>
+                <div class="text-right">
+                    <p id="currentTime" class="font-bold text-gray-900 text-lg"></p>
+                    <p id="currentDate" class="text-xs text-gray-600"></p>
+                </div>
+            </div>
+            <img src="https://logodix.com/logo/2182524.png" alt="DFLT Logo" class="h-10">
+        </header>
+
+        <div class="card overall-summary-card">
+            <div class="kpi-item">
+                <div class="label">Total Trainers Under IC</div>
+                <div class="value text-accent-main" id="totalTrainers">0</div>
+                <div class="comparison text-sm">
+                    <span class="status-dot active"></span> 
+                    <span id="activeTrainers">0</span> Active
+                </div>
+            </div>
+            <div class="kpi-item">
+                <div class="label">Beneficiaries Trained (This Month)</div>
+                <div class="value text-accent-success" id="monthlyBeneficiaries">0</div>
+                <div class="comparison text-sm positive">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8L11 17m-5 2a2 2 0 11-4 0 2 2 0 014 0zm7 0a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                    <span id="beneficiaryTargetAchieved">0%</span> of Target
+                </div>
+            </div>
+            <div class="kpi-item">
+                <div class="label">Trainings Completed (This Month)</div>
+                <div class="value text-accent-main" id="monthlyTrainings">0</div>
+                <div class="comparison text-sm">
+                    <span id="trainingsVsLastMonth">0%</span> vs. Last Month
+                </div>
+            </div>
+            <div class="kpi-item">
+                <div class="label">Avg. Attendance Rate</div>
+                <div class="value text-accent-main" id="avgAttendanceRate">0%</div>
+                <div class="comparison text-sm positive">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Good Standing
+                </div>
+            </div>
+             <div class="kpi-item">
+                <div class="label">Pending Reports</div>
+                <div class="value text-accent-danger" id="pendingReports">0</div>
+                <div class="comparison text-sm negative">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4.063A1.063 1.063 0 0112 11a1.063 1.063 0 01-1.063-1.063A1.063 1.063 0 0112 8.875a1.063 1.063 0 011.063 1.063z"></path></svg>
+                    Action Required
+                </div>
+            </div>
+            <div class="kpi-item">
+                <div class="label">Field Monitoring Visits (This Month)</div>
+                <div class="value text-accent-warning" id="monitoringVisits">0</div>
+                <div class="comparison text-sm">
+                    <span id="visitsTargetAchieved">0%</span> of Target
+                </div>
+            </div>
+        </div>
+
+        <div class="card team-performance-ranking-card">
+            <h3 class="text-lg font-bold mb-4">Team Performance Ranking (By Beneficiaries)</h3>
+            <div class="table-scroll-container">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr>
+                            <th class="rounded-tl-lg">Rank</th>
+                            <th>Trainer Name</th>
+                            <th>Province/District</th>
+                            <th>Beneficiaries (M)</th>
+                            <th>Trainings (M)</th>
+                            <th>Target %</th>
+                            <th class="rounded-tr-lg">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trainerRankingTableBody">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card attendance-compliance-card">
+            <h3 class="text-lg font-bold mb-4">Attendance & Compliance Trend</h3>
+            <div class="chart-container">
+                <canvas id="attendanceComplianceChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card bottleneck-identification-card">
+            <h3 class="text-lg font-bold mb-4">Operational Bottleneck Identification</h3>
+            <div class="chart-container">
+                <canvas id="bottleneckChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card training-type-distribution-card">
+            <h3 class="text-lg font-bold mb-4">Training Type Distribution</h3>
+            <div class="chart-container">
+                <canvas id="trainingTypeChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card recent-field-updates-card" id="recentFieldUpdatesCard">
+            <h3 class="text-lg font-bold mb-4">Recent Field Updates</h3>
+            <ul class="updates-list">
+                </ul>
+        </div>
+
+        <div class="card trainer-activity-map-card !p-1 relative">
+            <h3 class="absolute top-4 left-6 text-lg font-bold z-[1000] text-gray-800">Trainer Activity Map</h3>
+            <div id="icMap" class="rounded-2xl"></div>
+        </div>
+    </div>
+
+    <script>
+        // Data Generation for IC Deck
+        function generateICData(numRecords = 500) {
+            const provinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Azad Jammu & Kashmir", "Gilgit-Baltistan", "Islamabad Capital Territory"];
+            const districtsByProvince = {
+                "Punjab": ["Lahore", "Rawalpindi", "Faisalabad", "Multan", "Sialkot", "Gujranwala", "Bahawalpur"],
+                "Sindh": ["Karachi", "Hyderabad", "Sukkur", "Larkana"],
+                "Khyber Pakhtunkhwa": ["Peshawar", "Swat", "Mardan"],
+                "Balochistan": ["Quetta", "Khuzdar"],
+                "Azad Jammu & Kashmir": ["Muzaffarabad", "Mirpur"],
+                "Gilgit-Baltistan": ["Gilgit", "Skardu"],
+                "Islamabad Capital Territory": ["Islamabad"]
+            };
+            const trainerNames = ["Trainer 1", "Trainer 2", "Trainer 3", "Trainer 4", "Trainer 5", "Trainer 6", "Trainer 7", "Trainer 8", "Trainer 9", "Trainer 10", "Trainer 11", "Trainer 12", "Trainer 13", "Trainer 14", "Trainer 15", "Trainer 16", "Trainer 17", "Trainer 18", "Trainer 19", "Trainer 20"];
+            const icNames = ["IC-001 (Ali)", "IC-002 (Sara)", "IC-003 (Usman)", "IC-004 (Fatima)"];
+            const trainingTypes = ["Digital Literacy", "Financial Inclusion", "Entrepreneurship", "Basic IT Skills", "Cyber Security"];
+            const bottleneckReasons = ["Lack of Venue Availability", "Trainer Absences", "Material Shortages", "Low Beneficiary Mobilization", "Technical Issues", "Slow Reporting"];
+            const feedbackTypes = ["Positive", "Constructive", "Urgent Issue", "Logistics Query"];
+
+            const data = [];
+            const today = new Date();
+            const threeMonthsAgo = new Date(today);
+            threeMonthsAgo.setMonth(today.getMonth() - 2); // Data for last 3 months
+
+            function getRandomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+            function getRandomFloat(min, max) { return parseFloat((Math.random() * (max - min) + min).toFixed(1)); }
+            function getRandomDate(start, end) { return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime())); }
+            function getRandomArrayElement(arr) { return arr[getRandomInt(0, arr.length - 1)]; }
+
+            // Trainer performance tracking for consistency and unique locations
+            const trainerLocationData = {}; // Store consistent location for each trainer
+            trainerNames.forEach(name => {
+                trainerLocationData[name] = {
+                    latitude: getRandomFloat(24.0, 37.0),
+                    longitude: getRandomFloat(60.0, 78.0)
+                };
+            });
+
+            for (let i = 1; i <= numRecords; i++) {
+                const randomIC = getRandomArrayElement(icNames);
+                const randomTrainer = getRandomArrayElement(trainerNames);
+                const randomProvince = getRandomArrayElement(provinces);
+                const randomDistrict = getRandomArrayElement(districtsByProvince[randomProvince]);
+                const trainingDate = getRandomDate(threeMonthsAgo, today);
+                const beneficiaries = getRandomInt(15, 45);
+                const trainings = 1; // Each record represents one training session
+                const attendanceRate = getRandomFloat(70, 100);
+                const complianceScore = getRandomFloat(75, 100);
+                const trainingType = getRandomArrayElement(trainingTypes);
+                const hasBottleneck = Math.random() < 0.25; // 25% chance of bottleneck
+                const bottleneckReason = hasBottleneck ? getRandomArrayElement(bottleneckReasons) : null;
+                const dailyReportSubmitted = Math.random() < 0.9; // 90% chance of daily report
+                const reportLateDays = dailyReportSubmitted ? 0 : getRandomInt(1, 7);
+                const monitoringVisitCount = getRandomInt(0, 3); // per trainer
+                const feedbackCategory = getRandomArrayElement(feedbackTypes);
+                const feedbackNote = `Trainer ${randomTrainer} feedback: ${feedbackCategory}.`;
+                const trainerActiveStatus = Math.random() > 0.1; // 90% chance of active
+
+                data.push({
+                    "RecordID": `R-${i}`,
+                    "IC_ID": randomIC,
+                    "Province": randomProvince,
+                    "District": randomDistrict,
+                    "Trainer_Name": randomTrainer,
+                    "Training_Date": trainingDate.toISOString().split('T')[0],
+                    "Beneficiary_Count": beneficiaries,
+                    "Training_Count": trainings,
+                    "Attendance_Rate_Pct": attendanceRate,
+                    "Compliance_Score_Pct": complianceScore,
+                    "Training_Type": trainingType,
+                    "Has_Bottleneck": hasBottleneck,
+                    "Bottleneck_Reason": bottleneckReason,
+                    "Daily_Report_Submitted": dailyReportSubmitted,
+                    "Report_Late_Days": reportLateDays,
+                    "Monitoring_Visit_Count": monitoringVisitCount,
+                    "Feedback_Category": feedbackCategory,
+                    "Feedback_Note": feedbackNote,
+                    "Trainer_Active_Status": trainerActiveStatus,
+                    // Use consistent lat/lon from trainerLocationData
+                    "Trainer_Lat": trainerLocationData[randomTrainer].latitude + (Math.random() - 0.5) * 0.01, // Add very small random offset for distinct markers
+                    "Trainer_Lon": trainerLocationData[randomTrainer].longitude + (Math.random() - 0.5) * 0.01, // Add very small random offset
+                    "Trainer_Monthly_Target_Beneficiaries": getRandomInt(400, 600)
+                });
+            }
+            return data;
+        }
+
+        const icData = generateICData(1000); // Generate a good amount of data for the IC deck
+
+        // Global Chart.js instances
+        let attendanceComplianceChart;
+        let bottleneckChart;
+        let trainingTypeChart;
+        let icMap; // Leaflet map instance
+
+        // Global aggregated data cache (will be re-aggregated on filter change)
+        let icAggregatedData = {};
+
+        const CHART_COLORS_IC = {
+            primary: '#4c51bf', // Indigo
+            secondary: '#667eea', // Light Indigo
+            tertiary: '#38a169', // Success Green
+            warning: '#ecc94b', // Yellow Warning
+            danger: '#e53e3e', // Red Danger
+            info: '#0bc5ea', // Cyan Info
+            lightGrey: '#e2e8f0', // Light Grey for backgrounds
+            darkGrey: '#4a5568', // Darker Grey for text
+        };
+
+        // --- Event Listeners and Initial Setup ---
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOM Content Loaded. Initializing dashboard...");
+            updateTime();
+            setInterval(updateTime, 1000);
+
+            if (!icData || icData.length === 0) {
+                console.error("IC mock data is missing or empty!");
+                alert("Could not load IC data. Dashboard cannot be displayed.");
+                return;
+            }
+
+            console.log("IC Data loaded:", icData.length, "rows");
+
+            // Initial pre-processing with ALL data (before any filters are applied)
+            preProcessICData(icData);
+            populateFilters();
+            initializeCharts();
+            initializeMap(); // Initialize the map for IC Deck
+            updateDashboard(); // Initial render with 'All' filters
+            console.log("Dashboard initialized.");
+        });
+
+        // --- Data Pre-processing for IC Deck ---
+        // This function now takes 'data' as a parameter, so it can operate on filtered subsets.
+        function preProcessICData(data) {
+            icAggregatedData = {
+                totalTrainers: new Set(), // Use Set to count unique trainers
+                activeTrainers: new Set(), // Use Set for unique active trainers
+                monthlyBeneficiaries: 0,
+                monthlyTrainings: 0,
+                prevMonthBeneficiaries: 0, // For comparison
+                avgAttendanceRateSum: 0,
+                avgAttendanceRateCount: 0,
+                pendingReports: 0, // Count of pending reports (unique instances)
+                monitoringVisits: 0,
+                totalMonitoringTarget: 0, // Will be calculated dynamically based on filtered ICs
+                trainerPerformance: {}, // Aggregated per trainer
+                attendanceComplianceTrend: {}, // Daily/Monthly trend
+                bottleneckReasons: {},
+                trainingTypeDistribution: {},
+                recentUpdates: []
+            };
+
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+            const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+            const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+            // First pass: Initialize trainerPerformance objects with base data and find unique trainers for overall counts
+            data.forEach(item => {
+                const trainerName = item.Trainer_Name;
+                if (!icAggregatedData.trainerPerformance[trainerName]) {
+                    // Use the first encountered item to initialize static trainer properties like target, province, lat/lon
+                    icAggregatedData.trainerPerformance[trainerName] = {
+                        name: trainerName, // Store trainer name here for easy access later
+                        beneficiaries: 0,
+                        trainings: 0,
+                        targetBeneficiaries: item.Trainer_Monthly_Target_Beneficiaries,
+                        province: item.Province,
+                        district: item.District,
+                        status: item.Trainer_Active_Status ? 'Active' : 'Inactive',
+                        lat: item.Trainer_Lat,
+                        lon: item.Trainer_Lon,
+                        lastActivityDate: null // Will be updated to the latest date found
+                    };
+                }
+                icAggregatedData.totalTrainers.add(trainerName);
+                if (item.Trainer_Active_Status) {
+                    icAggregatedData.activeTrainers.add(trainerName);
+                }
+            });
+            
+            // Second pass: Aggregate dynamic data for all filtered records
+            data.forEach(item => {
+                const trainerName = item.Trainer_Name;
+                const trainingDate = new Date(item.Training_Date);
+                const monthKey = `${trainingDate.getFullYear()}-${(trainingDate.getMonth() + 1).toString().padStart(2, '0')}`;
+
+                // Monthly KPIs (for current month)
+                if (trainingDate.getMonth() === currentMonth && trainingDate.getFullYear() === currentYear) {
+                    icAggregatedData.monthlyBeneficiaries += item.Beneficiary_Count || 0;
+                    icAggregatedData.monthlyTrainings += item.Training_Count || 0;
+                } 
+                // Previous Month Beneficiaries (for comparison)
+                else if (trainingDate.getMonth() === lastMonth && trainingDate.getFullYear() === lastMonthYear) {
+                    icAggregatedData.prevMonthBeneficiaries += item.Beneficiary_Count || 0;
+                }
+
+                // Average Attendance Rate
+                if (item.Attendance_Rate_Pct !== undefined) {
+                    icAggregatedData.avgAttendanceRateSum += item.Attendance_Rate_Pct;
+                    icAggregatedData.avgAttendanceRateCount++;
+                }
+
+                // Pending Reports (count instances of reports being late)
+                if (item.Report_Late_Days > 0) {
+                    icAggregatedData.pendingReports++;
+                }
+                
+                // Monitoring Visits (sum all visits for this filtered group)
+                icAggregatedData.monitoringVisits += item.Monitoring_Visit_Count || 0;
+
+                // Trainer Performance Ranking - Update aggregated values for each trainer
+                if (icAggregatedData.trainerPerformance[trainerName]) {
+                    icAggregatedData.trainerPerformance[trainerName].beneficiaries += item.Beneficiary_Count || 0;
+                    icAggregatedData.trainerPerformance[trainerName].trainings += item.Training_Count || 0;
+                    const currentActivityDate = new Date(item.Training_Date);
+                    if (!icAggregatedData.trainerPerformance[trainerName].lastActivityDate || currentActivityDate > icAggregatedData.trainerPerformance[trainerName].lastActivityDate) {
+                        icAggregatedData.trainerPerformance[trainerName].lastActivityDate = currentActivityDate;
+                    }
+                    // Ensure the status reflects the latest from data if available
+                    icAggregatedData.trainerPerformance[trainerName].status = item.Trainer_Active_Status ? 'Active' : 'Inactive';
+                }
+
+
+                // Attendance/Compliance Trend data for charts (aggregated by month key)
+                icAggregatedData.attendanceComplianceTrend[monthKey] = icAggregatedData.attendanceComplianceTrend[monthKey] || { attendanceSum: 0, attendanceCount: 0, complianceSum: 0, complianceCount: 0 };
+                icAggregatedData.attendanceComplianceTrend[monthKey].attendanceSum += item.Attendance_Rate_Pct || 0;
+                icAggregatedData.attendanceComplianceTrend[monthKey].attendanceCount++;
+                icAggregatedData.attendanceComplianceTrend[monthKey].complianceSum += item.Compliance_Score_Pct || 0;
+                icAggregatedData.attendanceComplianceTrend[monthKey].complianceCount++;
+
+                // Bottleneck Reasons counts
+                if (item.Has_Bottleneck && item.Bottleneck_Reason) {
+                    icAggregatedData.bottleneckReasons[item.Bottleneck_Reason] = (icAggregatedData.bottleneckReasons[item.Bottleneck_Reason] || 0) + 1;
+                }
+
+                // Training Type Distribution counts
+                icAggregatedData.trainingTypeDistribution[item.Training_Type] = (icAggregatedData.trainingTypeDistribution[item.Training_Type] || 0) + 1;
+
+                // Recent Field Updates (collect all relevant, then sort and slice later)
+                // Filter to recent updates only (e.g., last 30 days) for efficiency if data is very large
+                const thirtyDaysAgo = new Date(now); // Use 'now' to prevent data from future if 'today' is a mock value
+                thirtyDaysAgo.setDate(now.getDate() - 30);
+                if (trainingDate >= thirtyDaysAgo) {
+                    icAggregatedData.recentUpdates.push({
+                        date: item.Training_Date,
+                        trainer: item.Trainer_Name,
+                        type: item.Feedback_Category,
+                        notes: item.Feedback_Note
+                    });
+                }
+            });
+
+            // Finalize calculations for total trainers/active trainers (convert Sets to sizes)
+            icAggregatedData.totalTrainers = icAggregatedData.totalTrainers.size;
+            icAggregatedData.activeTrainers = icAggregatedData.activeTrainers.size;
+
+            // Sort recent updates by date (newest first) and keep top N
+            icAggregatedData.recentUpdates.sort((a, b) => new Date(b.date) - new Date(a.date));
+            icAggregatedData.recentUpdates = icAggregatedData.recentUpdates.slice(0, 8); // Display top 8 recent updates
+            
+            console.log("IC data pre-processed complete for current filter:", icAggregatedData);
+        }
+
+        // --- UI Population and Update Functions ---
+
+        function updateTime() {
+            const now = new Date();
+            // Use Pakistan Standard Time (PKT) for current time/date display
+            // This requires the browser to support `timeZone` option correctly, which modern browsers do.
+            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Karachi' };
+            const dateOptions = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'Asia/Karachi' };
+
+            const currentTimeElement = document.getElementById('currentTime');
+            const currentDateElement = document.getElementById('currentDate');
+
+            if (currentTimeElement) currentTimeElement.textContent = now.toLocaleTimeString('en-GB', timeOptions);
+            if (currentDateElement) currentDateElement.textContent = now.toLocaleDateString('en-US', dateOptions);
+        }
+
+        function populateFilters() {
+            const icFilter = document.getElementById('icFilter');
+            const provinceFilter = document.getElementById('provinceFilter');
+
+            // Populate IC Filter
+            if (icFilter && icFilter.options.length <= 1) { // Check if only 'All ICs' is there
+                const uniqueICs = [...new Set(icData.map(item => item.IC_ID).filter(Boolean))].sort();
+                uniqueICs.forEach(ic => { icFilter.add(new Option(ic, ic)); });
+            }
+
+            // Populate Province Filter
+            if (provinceFilter && provinceFilter.options.length <= 1) { // Check if only 'All' is there
+                const uniqueProvinces = [...new Set(icData.map(item => item.Province).filter(Boolean))].sort();
+                uniqueProvinces.forEach(p => { provinceFilter.add(new Option(p, p)); });
+            }
+        }
+
+        // Initialize Chart.js charts
+        function initializeCharts() {
+            const ticksColor = CHART_COLORS_IC.darkGrey, gridColor = CHART_COLORS_IC.lightGrey;
+            const defaultOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false, labels: { color: ticksColor, font: { family: 'Montserrat' } } },
+                    tooltip: {
+                        titleColor: CHART_COLORS_IC.text, bodyColor: CHART_COLORS_IC.text,
+                        backgroundColor: '#fff', borderColor: CHART_COLORS_IC.border_color, borderWidth: 1,
+                        boxPadding: 6, bodyFont: { family: 'Montserrat', size: 12 }, titleFont: { family: 'Montserrat', size: 14, weight: 'bold' },
+                    },
+                    datalabels: { // Common datalabels plugin options
+                        color: CHART_COLORS_IC.text,
+                        font: { family: 'Montserrat', size: 10, weight: 'bold' },
+                        formatter: (value) => value.toLocaleString() // Default formatter
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: ticksColor, font: { family: 'Montserrat' } }, grid: { color: gridColor } },
+                    y: { ticks: { color: ticksColor, font: { family: 'Montserrat' } }, grid: { color: gridColor } }
+                }
+            };
+
+            // Attendance & Compliance Trend Chart
+            const attendanceCanvas = document.getElementById('attendanceComplianceChart');
+            if (attendanceCanvas) {
+                if (attendanceComplianceChart) attendanceComplianceChart.destroy(); // Destroy existing chart before creating new one
+                attendanceComplianceChart = new Chart(attendanceCanvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            { label: 'Avg. Attendance %', data: [], borderColor: CHART_COLORS_IC.accent_main, backgroundColor: CHART_COLORS_IC.accent_main + '1A', fill: 'start', tension: 0.3, pointRadius: 4 },
+                            { label: 'Avg. Compliance %', data: [], borderColor: CHART_COLORS_IC.accent_success, backgroundColor: CHART_COLORS_IC.accent_success + '1A', fill: false, tension: 0.3, pointRadius: 4 }
+                        ]
+                    },
+                    options: {
+                        ...defaultOptions,
+                        scales: {
+                            x: { type: 'time', time: { unit: 'month', tooltipFormat: 'MMM yyyy' }, ticks: { color: ticksColor, font: { family: 'Montserrat' } }, grid: { color: gridColor } },
+                            y: { beginAtZero: true, max: 100, ticks: { callback: value => value + '%', color: ticksColor, font: { family: 'Montserrat' } }, grid: { color: gridColor } }
+                        },
+                        plugins: {
+                            ...defaultOptions.plugins,
+                            datalabels: { display: false } // Hide datalabels for line chart
+                        }
+                    },
+                    plugins: [ChartDataLabels]
+                });
+            }
+
+
+            // Operational Bottleneck Identification Chart
+            const bottleneckCanvas = document.getElementById('bottleneckChart');
+            if (bottleneckCanvas) {
+                if (bottleneckChart) bottleneckChart.destroy(); // Destroy existing chart before creating new one
+                bottleneckChart = new Chart(bottleneckCanvas.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            data: [],
+                            backgroundColor: [CHART_COLORS_IC.accent_danger, CHART_COLORS_IC.accent_warning, CHART_COLORS_IC.accent_main, CHART_COLORS_IC.info, CHART_COLORS_IC.secondary],
+                            hoverOffset: 10
+                        }]
+                    },
+                    options: {
+                        ...defaultOptions,
+                        cutout: '65%', // Thicker donut
+                        plugins: {
+                            ...defaultOptions.plugins,
+                            legend: { display: true, position: 'right', labels: { color: ticksColor, font: { family: 'Montserrat', size: 11 }, usePointStyle: true } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.parsed;
+                                        const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
+                                        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
+                                        return `${label}: ${value} (${percentage})`;
+                                    }
+                                }
+                            },
+                            datalabels: {
+                                color: '#fff',
+                                formatter: (value, ctx) => {
+                                    const total = ctx.dataset.data.reduce((sum, val) => sum + val, 0);
+                                    const percentage = total > 0 ? ((value / total) * 100) : 0;
+                                    return percentage > 5 ? percentage.toFixed(0) + '%' : ''; // Only show if percentage is significant
+                                },
+                                font: { size: 12, weight: 'bold' },
+                                textShadowColor: 'rgba(0,0,0,0.4)',
+                                textShadowBlur: 4,
+                            }
+                        }
+                    },
+                    plugins: [ChartDataLabels]
+                });
+            }
+
+
+            // Training Type Distribution Chart
+            const trainingTypeCanvas = document.getElementById('trainingTypeChart');
+            if (trainingTypeCanvas) {
+                if (trainingTypeChart) trainingTypeChart.destroy(); // Destroy existing chart before creating new one
+                trainingTypeChart = new Chart(trainingTypeCanvas.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Trainings Conducted',
+                            data: [],
+                            backgroundColor: CHART_COLORS_IC.accent_light,
+                            borderColor: CHART_COLORS_IC.accent_main,
+                            borderWidth: 1,
+                            borderRadius: 5
+                        }]
+                    },
+                    options: {
+                        ...defaultOptions,
+                        indexAxis: 'y', // Horizontal bars
+                        scales: {
+                            x: { beginAtZero: true, ticks: { color: ticksColor, font: { family: 'Montserrat' } } },
+                            y: { ticks: { color: ticksColor, font: { family: 'Montserrat' } } }
+                        },
+                        plugins: {
+                            ...defaultOptions.plugins,
+                            datalabels: { anchor: 'end', align: 'end', formatter: (value) => value.toLocaleString() }
+                        },
+                        animation: {
+                            delay: (context) => context.dataIndex * 50
+                        }
+                    },
+                    plugins: [ChartDataLabels]
+                });
+            }
+        }
+
+        // Initialize Leaflet Map for IC Deck
+        function initializeMap() {
+            const mapElement = document.getElementById('icMap');
+            if (mapElement && !icMap) { // Only initialize if element exists and map is not already created
+                icMap = L.map(mapElement, { zoomControl: false, attributionControl: false }).setView([30.3753, 69.3451], 5.5);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', { // Dark basemap for contrast
+                    attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>',
+                    maxZoom: 18,
+                }).addTo(icMap);
+
+                // Add marker cluster group
+                icMap.markerClusterGroup = L.markerClusterGroup().addTo(icMap);
+                console.log("Leaflet Map Initialized.");
+            }
+        }
+
+        // Main update function for the dashboard
+        function updateDashboard() {
+            const selectedIC = document.getElementById('icFilter').value;
+            const selectedProvince = document.getElementById('provinceFilter').value;
+
+            const filteredData = icData.filter(item => {
+                const matchesIC = (selectedIC === 'IC-All' || item.IC_ID === selectedIC);
+                const matchesProvince = (selectedProvince === 'All' || item.Province === selectedProvince);
+                return matchesIC && matchesProvince;
+            });
+            console.log("Filtered data length:", filteredData.length);
+
+            // Re-process aggregated data for the current filtered view
+            preProcessICData(filteredData); // Re-run aggregation with filtered data
+
+            updateOverallSummaryKPIs(filteredData);
+            updateTeamPerformanceRanking(filteredData);
+            updateAttendanceComplianceChart(filteredData);
+            updateBottleneckIdentificationChart(filteredData);
+            updateTrainingTypeDistributionChart(filteredData);
+            updateTrainerActivityMap(filteredData);
+            updateRecentFieldUpdates(filteredData);
+        }
+
+        // --- KPI Update Functions ---
+        function updateOverallSummaryKPIs(data) {
+            // Retrieve values directly from the pre-processed global object
+            const totalTrainers = icAggregatedData.totalTrainers;
+            const activeTrainers = icAggregatedData.activeTrainers;
+            const currentMonthBeneficiaries = icAggregatedData.monthlyBeneficiaries;
+            const currentMonthTrainings = icAggregatedData.monthlyTrainings;
+            const prevMonthBeneficiaries = icAggregatedData.prevMonthBeneficiaries;
+            const avgAttendanceRate = icAggregatedData.avgAttendanceRateCount > 0 ? (icAggregatedData.avgAttendanceRateSum / icAggregatedData.avgAttendanceRateCount) : 0;
+            const pendingReportsCount = icAggregatedData.pendingReports;
+            const totalMonitoringVisits = icAggregatedData.monitoringVisits;
+
+            // Calculate targets relevant to current filter
+            let totalBeneficiaryTargetForSelectedIC = 0;
+            let totalMonitoringVisitTargetForSelectedIC = 0;
+            const selectedICFilter = document.getElementById('icFilter').value;
+
+            if (selectedICFilter !== 'IC-All') {
+                const trainersUnderThisIC = icData.filter(d => d.IC_ID === selectedICFilter);
+                const uniqueTrainers = [...new Set(trainersUnderThisIC.map(d => d.Trainer_Name))];
+                totalBeneficiaryTargetForSelectedIC = uniqueTrainers.reduce((sum, trainerName) => {
+                    const trainerSampleData = trainersUnderThisIC.find(d => d.Trainer_Name === trainerName);
+                    return sum + (trainerSampleData ? trainerSampleData.Trainer_Monthly_Target_Beneficiaries : 0);
+                }, 0);
+                totalMonitoringVisitTargetForSelectedIC = uniqueTrainers.length * 2; // Example: 2 visits per trainer under this IC
+            } else {
+                // Sum targets from all trainers if 'All ICs' is selected
+                totalBeneficiaryTargetForSelectedIC = Object.values(icAggregatedData.trainerPerformance).reduce((sum, tp) => sum + tp.targetBeneficiaries, 0);
+                // The totalMonitoringTarget should be a sum of targets for all ICs, which needs to be calculated in preProcess
+                // For now, use a fixed value or sum up from trainerPerformance if it contains 'visits' data.
+                totalMonitoringVisitTargetForSelectedIC = icAggregatedData.totalMonitoringTarget; // Placeholder, refine if needed
+            }
+            
+            const beneficiaryTargetAchievedPct = totalBeneficiaryTargetForSelectedIC > 0 ? ((currentMonthBeneficiaries / totalBeneficiaryTargetForSelectedIC) * 100).toFixed(1) : '0';
+            const trainingsVsLastMonth = prevMonthBeneficiaries > 0 ? (((currentMonthBeneficiaries - prevMonthBeneficiaries) / prevMonthBeneficiaries) * 100).toFixed(1) : '0';
+            const visitsTargetAchieved = totalMonitoringVisitTargetForSelectedIC > 0 ? ((totalMonitoringVisits / totalMonitoringVisitTargetForSelectedIC) * 100).toFixed(1) : '0';
+
+
+            // Update and animate DOM elements
+            if (document.getElementById('totalTrainers')) animateValue(document.getElementById('totalTrainers'), parseInt(document.getElementById('totalTrainers').textContent || '0'), totalTrainers);
+            if (document.getElementById('activeTrainers')) animateValue(document.getElementById('activeTrainers'), parseInt(document.getElementById('activeTrainers').textContent || '0'), activeTrainers);
+            if (document.getElementById('monthlyBeneficiaries')) animateValue(document.getElementById('monthlyBeneficiaries'), parseInt(document.getElementById('monthlyBeneficiaries').textContent || '0'), currentMonthBeneficiaries);
+            if (document.getElementById('beneficiaryTargetAchieved')) document.getElementById('beneficiaryTargetAchieved').textContent = `${beneficiaryTargetAchievedPct}%`;
+            if (document.getElementById('monthlyTrainings')) animateValue(document.getElementById('monthlyTrainings'), parseInt(document.getElementById('monthlyTrainings').textContent || '0'), currentMonthTrainings);
+            if (document.getElementById('trainingsVsLastMonth')) {
+                document.getElementById('trainingsVsLastMonth').textContent = `${trainingsVsLastMonth}%`;
+                document.getElementById('trainingsVsLastMonth').classList.toggle('positive', parseFloat(trainingsVsLastMonth) >= 0);
+                document.getElementById('trainingsVsLastMonth').classList.toggle('negative', parseFloat(trainingsVsLastMonth) < 0);
+            }
+            if (document.getElementById('avgAttendanceRate')) animateValue(document.getElementById('avgAttendanceRate'), parseInt(document.getElementById('avgAttendanceRate').textContent.replace('%', '') || '0'), avgAttendanceRate, 1000, 0);
+            if (document.getElementById('pendingReports')) animateValue(document.getElementById('pendingReports'), parseInt(document.getElementById('pendingReports').textContent || '0'), pendingReportsCount);
+            if (document.getElementById('monitoringVisits')) animateValue(document.getElementById('monitoringVisits'), parseInt(document.getElementById('monitoringVisits').textContent || '0'), totalMonitoringVisits);
+            if (document.getElementById('visitsTargetAchieved')) document.getElementById('visitsTargetAchieved').textContent = `${visitsTargetAchieved}%`;
+        }
+
+        // Animate numerical values
+        function animateValue(obj, start, end, duration = 1000, decimals = 0) {
+            if (!obj) return; // Ensure element exists
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const value = start + progress * (end - start);
+                obj.textContent = value.toFixed(decimals);
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // Update Team Performance Ranking
+        function updateTeamPerformanceRanking(data) {
+            // Get current filter values to apply to the ranking
+            const selectedIC = document.getElementById('icFilter').value;
+            const selectedProvince = document.getElementById('provinceFilter').value;
+
+            // Filter the pre-aggregated trainerPerformance data based on current filters
+            const filteredTrainerPerformance = Object.values(icAggregatedData.trainerPerformance).filter(tp => {
+                const matchesIC = (selectedIC === 'IC-All' || tp.icId === selectedIC); // Assuming trainerPerformance stores IC_ID as icId
+                const matchesProvince = (selectedProvince === 'All' || tp.province === selectedProvince);
+                return matchesIC && matchesProvince;
+            });
+
+            // Sort by beneficiaries (this month)
+            const rankedTrainers = filteredTrainerPerformance.sort((a, b) => b.beneficiaries - a.beneficiaries);
+
+            const tableBody = document.getElementById('trainerRankingTableBody');
+            if (!tableBody) return; // Ensure table body exists
+            tableBody.innerHTML = ''; // Clear existing rows
+
+            if (rankedTrainers.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="7" class="px-4 py-2 text-center text-gray-500">No trainer data for selected filters.</td></tr>`;
+                return;
+            }
+
+            rankedTrainers.forEach((trainer, index) => {
+                const targetAchieved = trainer.targetBeneficiaries > 0 ? ((trainer.beneficiaries / trainer.targetBeneficiaries) * 100) : 0;
+                const progressBarClass = targetAchieved >= 90 ? 'success' : (targetAchieved >= 60 ? 'warning' : 'danger');
+                const rowClass = targetAchieved < 50 ? 'alert-row' : ''; // Highlight low performers
+
+                const row = `
+                    <tr class="${rowClass} hover:bg-gray-50 cursor-pointer" data-trainer-name="${trainer.name}">
+                        <td>${index + 1}</td>
+                        <td class="font-medium">${trainer.name}</td>
+                        <td class="text-sm text-gray-600">${trainer.province || 'N/A'}, ${trainer.district || 'N/A'}</td>
+                        <td>${trainer.beneficiaries.toLocaleString()}</td>
+                        <td>${trainer.trainings.toLocaleString()}</td>
+                        <td>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar ${progressBarClass}" style="width: ${Math.min(100, targetAchieved)}%;"></div>
+                            </div>
+                            <span class="text-xs text-gray-600">${targetAchieved.toFixed(1)}%</span>
+                        </td>
+                        <td>
+                            <span class="status-dot ${trainer.status === 'Active' ? 'active' : 'inactive'}"></span>
+                            <span class="text-sm">${trainer.status}</span>
+                        </td>
+                    </tr>
+                `;
+                tableBody.insertAdjacentHTML('beforeend', row);
+            });
+
+            // Re-apply progress bar animations after DOM update
+            document.querySelectorAll('#trainerRankingTableBody .progress-bar').forEach(bar => {
+                const initialWidth = bar.style.width;
+                bar.style.width = '0%'; // Reset to 0 for re-animation
+                setTimeout(() => bar.style.width = initialWidth, 50); // Small delay to trigger reflow and animation
+            });
+
+            // Simulate drill-down on row click
+            tableBody.querySelectorAll('tr').forEach(row => {
+                row.addEventListener('click', (event) => {
+                    const trainerName = event.currentTarget.dataset.trainerName;
+                    if (trainerName) {
+                        alert(`Drilling down into Trainer: ${trainerName}\n\n(This would navigate to a detailed Trainer Deck in a real system)`);
+                        // In a real application, you'd navigate to a new page or load a modal here
+                    }
+                });
+            });
+        }
+
+        // Update Attendance & Compliance Trend Chart
+        function updateAttendanceComplianceChart(data) {
+            const trendData = {};
+            // Aggregate attendance/compliance based on filtered data
+            data.forEach(item => {
+                const trainingDate = new Date(item.Training_Date);
+                const monthKey = `${trainingDate.getFullYear()}-${(trainingDate.getMonth() + 1).toString().padStart(2, '0')}`;
+                trendData[monthKey] = trendData[monthKey] || { attendanceSum: 0, attendanceCount: 0, complianceSum: 0, complianceCount: 0 };
+                trendData[monthKey].attendanceSum += item.Attendance_Rate_Pct || 0;
+                trendData[monthKey].attendanceCount++;
+                trendData[monthKey].complianceSum += item.Compliance_Score_Pct || 0;
+                trendData[monthKey].complianceCount++;
+            });
+
+            // Ensure chronological order and fill missing months with zero for continuous lines
+            const allMonths = [];
+            const today = new Date();
+            const threeMonthsAgo = new Date(today);
+            threeMonthsAgo.setMonth(today.getMonth() - 2); // Start 2 months back
+
+            let currentDateIterator = new Date(threeMonthsAgo.getFullYear(), threeMonthsAgo.getMonth(), 1);
+            while (currentDateIterator <= today) {
+                const monthKey = `${currentDateIterator.getFullYear()}-${(currentDateIterator.getMonth() + 1).toString().padStart(2, '0')}`;
+                allMonths.push(monthKey);
+                currentDateIterator.setMonth(currentDateIterator.getMonth() + 1);
+            }
+
+            const labels = [];
+            const avgAttendance = [];
+            const avgCompliance = [];
+
+            allMonths.forEach(monthKey => {
+                labels.push(new Date(monthKey)); // Use Date objects for Chart.js time scale
+                const dataPoint = trendData[monthKey] || { attendanceSum: 0, attendanceCount: 0, complianceSum: 0, complianceCount: 0 };
+                avgAttendance.push(dataPoint.attendanceCount > 0 ? (dataPoint.attendanceSum / dataPoint.attendanceCount) : 0);
+                avgCompliance.push(dataPoint.complianceCount > 0 ? (dataPoint.complianceSum / dataPoint.complianceCount) : 0);
+            });
+
+            if (attendanceComplianceChart) { // Check if chart instance exists
+                attendanceComplianceChart.data.labels = labels;
+                attendanceComplianceChart.data.datasets[0].data = avgAttendance.map((val, idx) => ({x: labels[idx], y: val}));
+                attendanceComplianceChart.data.datasets[1].data = avgCompliance.map((val, idx) => ({x: labels[idx], y: val}));
+                attendanceComplianceChart.update();
+            }
+        }
+
+        // Update Operational Bottleneck Identification Chart
+        function updateBottleneckIdentificationChart(data) {
+            const bottleneckCounts = {};
+            // Aggregate counts from filtered data
+            data.forEach(item => {
+                if (item.Has_Bottleneck && item.Bottleneck_Reason) {
+                    bottleneckCounts[item.Bottleneck_Reason] = (bottleneckCounts[item.Bottleneck_Reason] || 0) + 1;
+                }
+            });
+
+            const sortedBottlenecks = Object.entries(bottleneckCounts).sort((a, b) => b[1] - a[1]);
+            const labels = sortedBottlenecks.map(b => b[0]);
+            const counts = sortedBottlenecks.map(b => b[1]);
+
+            if (bottleneckChart) { // Check if chart instance exists
+                bottleneckChart.data.labels = labels;
+                bottleneckChart.data.datasets[0].data = counts;
+                bottleneckChart.update();
+            }
+        }
+
+        // Update Training Type Distribution Chart
+        function updateTrainingTypeDistributionChart(data) {
+            const trainingTypeCounts = {};
+            // Aggregate counts from filtered data
+            data.forEach(item => {
+                trainingTypeCounts[item.Training_Type] = (trainingTypeCounts[item.Training_Type] || 0) + 1;
+            });
+
+            const sortedTypes = Object.entries(trainingTypeCounts).sort((a, b) => b[1] - a[1]);
+            const labels = sortedTypes.map(t => t[0]);
+            const counts = sortedTypes.map(t => t[1]);
+
+            if (trainingTypeChart) { // Check if chart instance exists
+                trainingTypeChart.data.labels = labels;
+                trainingTypeChart.data.datasets[0].data = counts;
+                trainingTypeChart.update();
+            }
+        }
+
+        // Update Trainer Activity Map
+        function updateTrainerActivityMap(data) {
+            if (!icMap || !icMap.markerClusterGroup) return; // Ensure map and cluster group are initialized
+
+            icMap.markerClusterGroup.clearLayers(); // Clear existing markers
+
+            const trainersOnMap = {};
+            // Aggregate data to get the latest position/status per trainer from the filtered data
+            data.forEach(item => {
+                if (item.Trainer_Lat && item.Trainer_Lon) {
+                    const currentTrainingDate = new Date(item.Training_Date);
+                    // Only update if this record is more recent for this trainer
+                    if (!trainersOnMap[item.Trainer_Name] || currentTrainingDate > trainersOnMap[item.Trainer_Name].latestActivityDate) {
+                        trainersOnMap[item.Trainer_Name] = {
+                            lat: item.Trainer_Lat,
+                            lon: item.Trainer_Lon,
+                            status: item.Trainer_Active_Status,
+                            beneficiaries: item.Beneficiary_Count, // Beneficiaries from this specific training (or latest for that trainer)
+                            latestActivityDate: currentTrainingDate,
+                            province: item.Province,
+                            district: item.District,
+                            icId: item.IC_ID,
+                            trainerName: item.Trainer_Name
+                        };
+                    }
+                }
+            });
+
+            Object.values(trainersOnMap).forEach(trainer => {
+                const markerSize = 25 + Math.min(15, (trainer.beneficiaries || 0) / 10); // Scale marker size dynamically
+                let markerColorClass = '';
+                const daysSinceLastActivity = (new Date() - trainer.latestActivityDate) / (1000 * 60 * 60 * 24);
+
+                if (trainer.status) { // Active trainer
+                    if (daysSinceLastActivity <= 2) { // Very recent activity (e.g., reported today/yesterday)
+                        markerColorClass = 'active';
+                    } else if (daysSinceLastActivity <= 7) { // Some recent activity, but not daily
+                        markerColorClass = 'low-activity';
+                    } else { // Active but no recent reports (stale data)
+                        markerColorClass = 'critical'; // Highlight potential issue
+                    }
+                } else { // Inactive trainer
+                    markerColorClass = 'critical'; // Always critical if inactive
+                }
+
+                const customIcon = L.divIcon({
+                    className: `trainer-marker-icon ${markerColorClass}`,
+                    html: `<div style="width:${markerSize}px; height:${markerSize}px; display:flex; align-items:center; justify-content:center; border-radius:50%; background-color: inherit;">
+                                <span class="text-xs font-bold text-white">${(trainer.beneficiaries || 0)}+</span>
+                           </div>`,
+                    iconSize: [markerSize, markerSize],
+                    iconAnchor: [markerSize / 2, markerSize / 2]
+                });
+
+                const popupContent = `
+                    <div style="font-family: 'Montserrat', sans-serif; color: ${CHART_COLORS_IC.text};">
+                        <h4 class="font-bold text-base mb-1">${trainer.trainerName} (${trainer.icId})</h4>
+                        <p class="text-xs text-gray-600 mb-2">${trainer.province || 'N/A'}, ${trainer.district || 'N/A'}</p>
+                        <p class="text-sm"><strong>Beneficiaries (Last Report):</strong> ${trainer.beneficiaries || 0}</p>
+                        <p class="text-sm"><strong>Status:</strong> <span class="font-semibold ${trainer.status ? 'text-green-600' : 'text-red-600'}">${trainer.status ? 'Active' : 'Inactive'}</span></p>
+                        <p class="text-sm"><strong>Last Activity:</strong> ${trainer.latestActivityDate.toISOString().split('T')[0] || 'N/A'}</p>
+                    </div>
+                `;
+
+                L.marker([trainer.lat, trainer.lon], { icon: customIcon })
+                    .bindPopup(popupContent)
+                    .addTo(icMap.markerClusterGroup);
+            });
+
+            // Adjust map view to fit new markers if clusters are off
+            if (icMap.markerClusterGroup.getLayers().length > 0) {
+                 icMap.fitBounds(icMap.markerClusterGroup.getBounds().pad(0.1));
+            } else {
+                icMap.setView([30.3753, 69.3451], 5.5); // Default view if no markers
+            }
+        }
+
+        // Update Recent Field Updates list
+        function updateRecentFieldUpdates(data) {
+            const updatesList = document.querySelector('#recentFieldUpdatesCard .updates-list');
+            if (!updatesList) return; // Ensure element exists
+            updatesList.innerHTML = ''; // Clear existing list
+
+            // icAggregatedData.recentUpdates is already pre-sorted and sliced
+            const recentUpdates = icAggregatedData.recentUpdates;
+
+            if (recentUpdates.length === 0) {
+                updatesList.innerHTML = `<li class="text-center text-gray-500 py-4">No recent field updates for selected filters.</li>`;
+                return;
+            }
+
+            recentUpdates.forEach((update, index) => {
+                let iconSvg = '';
+                let iconColorClass = 'text-gray-500';
+                if (update.type === 'Positive') {
+                    iconSvg = `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`;
+                    iconColorClass = 'text-accent-success';
+                } else if (update.type === 'Urgent Issue') {
+                    iconSvg = `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.3 2.607-1.3 3.372 0l2.583 4.496a1.5 1.5 0 01-.842 2.147l-4.504 2.122a1.5 1.5 0 01-1.636-.341l-2.086-2.086a1.5 1.5 0 01.341-1.636l2.122-4.504a1.5 1.5 0 012.147-.842zM10 18a8 8 0 100-16 8 8 0 000 16zM9.5 9.5a1 1 0 10-2 0 1 1 0 002 0zm3 0a1 1 0 10-2 0 1 1 0 002 0z" clip-rule="evenodd"></path></svg>`;
+                    iconColorClass = 'text-accent-danger';
+                } else if (update.type === 'Constructive') {
+                    iconSvg = `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>`;
+                    iconColorClass = 'text-accent-warning';
+                } else { // Logistics Query or other
+                    iconSvg = `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.17-.959V13.5a3.5 3.5 0 003.5 3.5h.5c.21 0 .41-.023.61-.056A8.88 8.88 0 0010 17c4.418 0 8-3.134 8-7s-3.582-7-8-7-8 3.134-8 7c0 .195.016.39.044.583A3.001 3.001 0 012 10.5V10c0-3.866 3.582-7 8-7s8 3.134 8 7zM9 9a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd"></path></svg>`;
+                    iconColorClass = 'text-accent-main';
+                }
+
+                const updateItemHtml = `
+                    <li class="update-item" style="animation-delay: ${index * 0.1}s;">
+                        <div class="icon ${iconColorClass}">${iconSvg}</div>
+                        <div class="content">
+                            <p><strong>${update.trainer}</strong> reported: ${update.notes}</p>
+                            <span class="date">${update.date}</span>
+                        </div>
+                    </li>
+                `;
+                updatesList.insertAdjacentHTML('beforeend', updateItemHtml);
+            });
+        }
+    </script>
+</body>
+</html>

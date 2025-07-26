@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DFLT Phase 2 - Trainer Deck & Program Impact Dashboard</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-radial-bar@0.2.0/dist/chartjs-chart-radial-bar.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script> <style>
+        :root {
+            --bg-color: #f8f9fe; --card-bg: #ffffff; --border-color: #eef0f8; --text-primary: #1a202c; --text-secondary: #718096; --accent-main: #4f46e5; --accent-light: #e0e7ff; --shadow-subtle: 0 4px 12px rgba(0,0,0,0.05); --shadow-hover: 0 8px 24px rgba(0,0,0,0.1); --radius: 1rem;
+        }
+        body { font-family: 'Montserrat', sans-serif; background-color: var(--bg-color); color: var(--text-primary); overflow: hidden; -webkit-font-smoothing: antialiased; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: 70px 3fr 3fr 3fr; gap: 1.25rem; height: 100vh; padding: 1.25rem; }
+        .card { background-color: var(--card-bg); border-radius: var(--radius); border: 1px solid var(--border-color); padding: 1.25rem; box-shadow: var(--shadow-subtle); display: flex; flex-direction: column; min-height: 0; animation: fadeIn 0.8s ease forwards; opacity: 0; }
+        select, button, input[type="date"] { padding: 0.5rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border-color); background-color: var(--card-bg); font-size: 0.8rem; font-weight: 500; transition: all 0.2s ease; cursor: pointer; }
+        select { -moz-appearance: none; -webkit-appearance: none; appearance: none; padding-right: 2.5rem; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 14px 14px; }
+        button:hover { border-color: var(--accent-main); color: var(--accent-main); }
+        .scrollable { overflow-y: auto; } .scrollable::-webkit-scrollbar { width: 5px; } .scrollable::-webkit-scrollbar-track { background: transparent; } .scrollable::-webkit-scrollbar-thumb { background-color: #d1d5db; border-radius: 10px; }
+        
+        /* Layout */
+        .header { grid-column: 1 / -1; grid-row: 1; }
+        .overall-deck-stats-card { grid-column: 1 / 4; grid-row: 2; }
+        .top-bottom-sections-card { grid-column: 4 / 7; grid-row: 2; }
+        .program-outreach-card { grid-column: 7 / -1; grid-row: 2; }
+
+        .section-by-section-matrix-card { grid-column: 1 / 7; grid-row: 3; }
+        .trainer-ranking-card { grid-column: 7 / -1; grid-row: 3; }
+        
+        .section-details-card { grid-column: 1 / 7; grid-row: 4; }
+        .deck-map-card { grid-column: 7 / -1; grid-row: 4; }
+
+        /* Card specific styling */
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; flex-grow: 1; }
+        .stat-item { padding: 0.75rem; border-radius: 0.75rem; border: 1px solid var(--border-color); text-align: center; background-color: #fcfcfc;}
+
+        .coverage-bar-full { display: flex; align-items: center; gap: 0.5rem; }
+        .bar-container { flex-grow: 1; height: 6px; background-color: var(--border-color); border-radius: 3px; }
+        .bar-fill { height: 100%; border-radius: 3px; } /* Color set dynamically */
+
+        /* Gauge Chart Styling (from Chart.js Radial Bar) */
+        .gauge-container { display: flex; justify-content: center; align-items: center; flex-direction: column; height: 100%;}
+        .gauge-chart-wrapper { position: relative; width: 150px; height: 100px; margin-bottom: 0.5rem; }
+        .gauge-chart-value { position: absolute; top: 70%; left: 50%; transform: translate(-50%, -50%); font-size: 1.5rem; font-weight: 700; color: var(--text-primary); }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Table Specifics */
+        #sectionMatrix table, #trainerRankingTable table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; }
+        #sectionMatrix th, #sectionMatrix td, #trainerRankingTable th, #trainerRankingTable td { padding: 0.5rem; font-size: 0.75rem; text-align: center; border-bottom: 1px solid var(--border-color); }
+        #sectionMatrix thead th, #trainerRankingTable thead th { position: sticky; top: 0; background-color: #f8fafc; font-weight: 600; white-space: nowrap; z-index: 10;}
+        #sectionMatrix tr.deck-section-row, #trainerRankingTable tr.trainer-row { cursor: pointer; transition: background-color 0.2s ease; }
+        #sectionMatrix tr.deck-section-row:hover, #trainerRankingTable tr.trainer-row:hover { background-color: var(--accent-light); }
+        #sectionMatrix tr.deck-section-row.selected { background-color: var(--accent-main) !important; color: white; }
+        #sectionMatrix tr.deck-section-row.selected td { border-color: var(--accent-main); }
+        #trainerRankingTable tr.trainer-row.selected { background-color: var(--accent-main) !important; color: white; }
+        #trainerRankingTable tr.trainer-row.selected td { border-color: var(--accent-main); }
+
+        /* Custom Leaflet markers for engagement */
+        .leaflet-marker-icon.engagement-low { background-color: #ef4444; border: 2px solid #b91c1c; } /* Red */
+        .leaflet-marker-icon.engagement-medium { background-color: #fbbf24; border: 2px solid #d97706; } /* Yellow */
+        .leaflet-marker-icon.engagement-high { background-color: #22c55e; border: 2px solid #16a34a; } /* Green */
+        .leaflet-marker-icon {
+            border-radius: 50%;
+            width: 15px !important;
+            height: 15px !important;
+            margin-left: -7.5px !important;
+            margin-top: -7.5px !important;
+            opacity: 0.8;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-grid">
+        <header class="card header flex flex-row items-center justify-between !py-3">
+            <div class="flex items-center gap-4"><img src="https://www.sdpi.org/assets/images/sdpi-logo-2020.webp" alt="SDPI Logo" class="h-10"><h1 class="text-xl font-bold">DFLT Program Impact Dashboard</h1></div>
+            <div class="flex items-center gap-3">
+                <input type="date" id="startDateFilter" onchange="handleFilterChange('startDate', this.value)">
+                <input type="date" id="endDateFilter" onchange="handleFilterChange('endDate', this.value)">
+                <select id="provinceFilter" class="w-44" onchange="handleFilterChange('province', this.value)"></select>
+                <select id="globalTrainerFilter" class="w-44" onchange="handleFilterChange('trainer', this.value)"></select>
+                <button id="clearFiltersBtn" onclick="clearFilters()">Clear All Filters</button>
+                <div class="text-right pl-4 border-l border-gray-200"><p id="currentTime" class="font-bold text-lg"></p><p id="currentDate" class="text-xs text-gray-600"></p></div>
+            </div>
+        </header>
+
+        <div class="card overall-deck-stats-card"><h3 class="text-base font-bold mb-2">Overall Deck Engagement & Coverage</h3><div id="overallDeckStats" class="flex-grow flex flex-col justify-around text-center">
+            <div class="stats-grid">
+                <div class="stat-item"><p class="text-sm text-gray-500">Total Deck Sections</p><p id="totalDeckSections" class="text-2xl font-bold text-accent-main">-</p></div>
+                <div class="stat-item"><p class="text-sm text-gray-500">Total Sessions Tracked</p><p id="totalSessionsTracked" class="text-2xl font-bold text-accent-main">-</p></div>
+                <div class="stat-item">
+                    <p class="text-sm text-gray-500">Avg. Main Section Coverage</p>
+                    <div class="gauge-container">
+                        <div class="gauge-chart-wrapper"><canvas id="avgMainSectionCoverageGauge"></canvas><span id="avgMainSectionCoverageValue" class="gauge-chart-value">-</span></div>
+                    </div>
+                </div>
+                <div class="stat-item"><p class="text-sm text-gray-500">Avg. Sub-Concept Coverage</p><p id="avgSubConceptCoverage" class="text-2xl font-bold text-accent-main">-</p></div>
+            </div>
+        </div></div>
+
+        <div class="card top-bottom-sections-card"><h3 class="text-base font-bold mb-2">Section Coverage Overview</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow">
+                <div><p class="font-semibold text-sm mb-1">Most Covered Sections</p><canvas id="mostCoveredChart"></canvas></div>
+                <div><p class="font-semibold text-sm mb-1">Least Covered Sections</p><canvas id="leastCoveredChart"></canvas></div>
+            </div>
+        </div>
+
+        <div class="card program-outreach-card"><h3 class="text-base font-bold mb-2">Program Outreach & Resource Distribution</h3>
+            <div class="grid grid-cols-2 gap-4 flex-grow">
+                <div class="col-span-2 grid grid-cols-2 gap-4">
+                    <div class="stat-item"><p class="text-sm text-gray-500">Total Beneficiaries Trained</p><p id="totalBeneficiariesTrained" class="text-2xl font-bold text-green-600">-</p></div>
+                    <div class="stat-item"><p class="text-sm text-gray-500">Total Handbooks Distributed</p><p id="totalHandbooksDistributed" class="text-2xl font-bold text-blue-600">-</p></div>
+                </div>
+                <div class="col-span-2"><canvas id="programTrendChart"></canvas></div>
+            </div>
+        </div>
+
+        <div class="card section-by-section-matrix-card"><h3 class="text-base font-bold mb-2">Section-by-Section Performance Matrix</h3><div id="sectionMatrix" class="scrollable flex-grow"></div></div>
+        
+        <div class="card trainer-ranking-card"><h3 class="text-base font-bold mb-2">Trainer Ranking by Target Achievement</h3>
+            <div id="trainerRankingTable" class="scrollable flex-grow"></div>
+        </div>
+
+        <div class="card section-details-card"><h3 class="text-base font-bold mb-2" id="sectionDetailsTitle">Details for [Selected Section]</h3>
+            <div class="flex flex-col md:flex-row gap-4 flex-grow min-h-0">
+                <div class="w-full md:w-1/2 flex flex-col">
+                    <p class="font-semibold text-sm mb-1" id="subConceptBreakdownTitle">Sub-Concept Coverage for [Section]</p>
+                    <div class="relative flex-grow min-h-[150px]"><canvas id="sectionBreakdownChart"></canvas></div>
+                    <div id="sectionFeedbackNotes" class="scrollable text-left text-sm mt-3 p-2 bg-blue-50 rounded-md border border-blue-200 min-h-[80px]"></div>
+                </div>
+                <div class="w-full md:w-1/2 flex flex-col">
+                    <p class="font-semibold text-sm mb-1" id="trainerSpecificTitle">Trainer Notes & Issues for [Selected Section]</p>
+                    <div id="sectionMissedSessions" class="scrollable text-left text-sm p-2 bg-red-50 rounded-md border border-red-200 min-h-[80px]"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card deck-map-card !p-0"><div id="deckMap" class="h-full w-full rounded-lg"></div></div>
+    </div>
+
+<script>
+// Register Chart.js Datalabels Plugin globally
+Chart.register(ChartDataLabels);
+
+// --- MASTER DATA & CONFIG ---
+const SYLLABUS = { 
+    "Intro": ["BISP Intro", "Storytelling"], 
+    "Money Mgmt": ["Know When", "Count & Confirm", "No Deductions"], 
+    "Financial Plan": ["Budgeting", "Saving", "Investment"], 
+    "Banking": ["Account Types", "Bank Services", "ATM Demo"], 
+    "Risks": ["Fraud Types", "Loan Mgmt", "NSER Importance"], 
+    "Practical": ["Calculator Use", "Saving Number", "Reading SMS"] 
+};
+const ALL_MAIN_SECTIONS = Object.keys(SYLLABUS);
+const ALL_SUB_CONCEPTS = [].concat(...Object.values(SYLLABUS)); // Flatten all sub-concepts
+
+// Mock Data - Simulating Training Session Reporting Form data for the deck
+// Added 'Time_Spent_Per_Section', 'Audience_Engagement_Per_Section', 'Beneficiaries_Trained', 'Handbooks_Distributed'
+const mockTrainingSessionData = [
+    { SessionID: "TS001", Trainer: "Ali Raza", Province: "Punjab", Date: "2025-07-25", GPS: [31.52, 74.35], Concepts_Covered: ["BISP Intro", "Storytelling", "Know When", "Count & Confirm", "No Deductions", "Budgeting", "Saving", "Investment", "Account Types", "Bank Services", "Fraud Types", "Loan Mgmt", "NSER Importance", "Calculator Use", "Saving Number", "Reading SMS"], Trainer_Feedback_Deck_Section: { "Intro": "Audience loved the opening story.", "Banking": "ATM Demo needs better visual aids." }, Time_Spent_Per_Section: { "Intro": 20, "Money Mgmt": 30, "Financial Plan": 40, "Banking": 25, "Risks": 35, "Practical": 15 }, Audience_Engagement_Per_Section: { "Intro": 5, "Money Mgmt": 4, "Financial Plan": 5, "Banking": 3, "Risks": 4, "Practical": 4 }, Trainer_Rating: 8.5, Beneficiaries_Trained: 50, Handbooks_Distributed: 48 },
+    { SessionID: "TS002", Trainer: "Sana Khan", Province: "Sindh", Date: "2025-07-24", GPS: [24.86, 67.01], Concepts_Covered: ["BISP Intro", "Storytelling", "Know When", "Count & Confirm", "No Deductions", "Budgeting", "Saving", "Investment", "Account Types", "Bank Services", "ATM Demo", "Fraud Types", "Loan Mgmt", "NSER Importance", "Calculator Use", "Saving Number", "Reading SMS"], Trainer_Feedback_Deck_Section: {}, Time_Spent_Per_Section: { "Intro": 18, "Money Mgmt": 28, "Financial Plan": 38, "Banking": 30, "Risks": 32, "Practical": 20 }, Audience_Engagement_Per_Section: { "Intro": 4, "Money Mgmt": 5, "Financial Plan": 4, "Banking": 4, "Risks": 4, "Practical": 5 }, Trainer_Rating: 9.0, Beneficiaries_Trained: 60, Handbooks_Distributed: 55 },
+    { SessionID: "TS003", Trainer: "Usman Malik", Province: "KPK", Date: "2025-07-23", GPS: [34.01, 71.52], Concepts_Covered: ["BISP Intro", "Storytelling", "Know When", "Count & Confirm", "No Deductions", "Budgeting", "Saving", "Account Types", "Bank Services", "ATM Demo", "NSER Importance", "Calculator Use", "Saving Number", "Reading SMS"], Trainer_Feedback_Deck_Section: { "Risks": "Ran out of time here, felt rushed." }, Time_Spent_Per_Section: { "Intro": 15, "Money Mgmt": 25, "Financial Plan": 30, "Banking": 20, "Risks": 10, "Practical": 12 }, Audience_Engagement_Per_Section: { "Intro": 3, "Money Mgmt": 4, "Financial Plan": 3, "Banking": 2, "Risks": 1, "Practical": 3 }, Trainer_Rating: 7.0, Beneficiaries_Trained: 35, Handbooks_Distributed: 30 }, // Rushed 'Risks'
+    { SessionID: "TS004", Trainer: "Fatima Ahmed", Province: "Balochistan", Date: "2025-07-22", GPS: [30.21, 67.01], Concepts_Covered: ["BISP Intro", "Storytelling", "Know When", "Count & Confirm", "No Deductions", "Budgeting", "Saving", "Investment", "Fraud Types", "Loan Mgmt", "NSER Importance", "Calculator Use", "Saving Number", "Reading SMS"], Trainer_Feedback_Deck_Section: { "Banking": "Found banking theory hard to explain without physical examples." }, Time_Spent_Per_Section: { "Intro": 22, "Money Mgmt": 35, "Financial Plan": 45, "Banking": 15, "Risks": 30, "Practical": 18 }, Audience_Engagement_Per_Section: { "Intro": 4, "Money Mgmt": 4, "Financial Plan": 4, "Banking": 2, "Risks": 3, "Practical": 4 }, Trainer_Rating: 7.5, Beneficiaries_Trained: 45, Handbooks_Distributed: 40 }, // Weak on banking theory
+    { SessionID: "TS005", Trainer: "Ali Raza", Province: "Punjab", Date: "2025-07-21", GPS: [31.41, 73.07], Concepts_Covered: ["BISP Intro", "Storytelling", "Know When", "Count & Confirm", "No Deductions", "Budgeting", "Saving", "Investment", "Account Types", "Bank Services", "ATM Demo", "Fraud Types", "Loan Mgmt", "NSER Importance", "Calculator Use", "Saving Number", "Reading SMS"], Trainer_Feedback_Deck_Section: {}, Time_Spent_Per_Section: { "Intro": 20, "Money Mgmt": 30, "Financial Plan": 40, "Banking": 25, "Risks": 35, "Practical": 15 }, Audience_Engagement_Per_Section: { "Intro": 5, "Money Mgmt": 4, "Financial Plan": 5, "Banking": 4, "Risks": 4, "Practical": 4 }, Trainer_Rating: 8.8, Beneficiaries_Trained: 55, Handbooks_Distributed: 50 },
+    { SessionID: "TS006", Trainer: "Sana Khan", Province: "Sindh", Date: "2025-07-20", GPS: [24.90, 67.05], Concepts_Covered: ["BISP Intro", "Storytelling", "Know When", "Count & Confirm", "No Deductions", "Budgeting", "Saving", "Investment", "Account Types", "Bank Services", "ATM Demo", "Fraud Types", "NSER Importance", "Calculator Use", "Saving Number", "Reading SMS"], Trainer_Feedback_Deck_Section: { "Risks": "Forgot to emphasize loan management, need to remember for next time." }, Time_Spent_Per_Section: { "Intro": 18, "Money Mgmt": 28, "Financial Plan": 38, "Banking": 30, "Risks": 20, "Practical": 20 }, Audience_Engagement_Per_Section: { "Intro": 4, "Money Mgmt": 5, "Financial Plan": 4, "Banking": 4, "Risks": 3, "Practical": 5 }, Trainer_Rating: 8.9, Beneficiaries_Trained: 65, Handbooks_Distributed: 60 }, // Missed loan management
+    { SessionID: "TS007", Trainer: "Usman Malik", Province: "Punjab", Date: "2025-07-19", GPS: [31.50, 74.30], Concepts_Covered: ["BISP Intro", "Know When", "Count & Confirm", "Budgeting", "Saving", "Account Types", "Fraud Types", "Loan Mgmt", "Calculator Use"], Trainer_Feedback_Deck_Section: { "Intro": "Storytelling felt less impactful this time.", "Practical": "Saving Number concept needs more local examples." }, Time_Spent_Per_Section: { "Intro": 10, "Money Mgmt": 20, "Financial Plan": 25, "Banking": 15, "Risks": 25, "Practical": 10 }, Audience_Engagement_Per_Section: { "Intro": 2, "Money Mgmt": 3, "Financial Plan": 3, "Banking": 2, "Risks": 3, "Practical": 2 }, Trainer_Rating: 6.5, Beneficiaries_Trained: 40, Handbooks_Distributed: 38 },
+    { SessionID: "TS008", Trainer: "Fatima Ahmed", Province: "KPK", Date: "2025-07-18", GPS: [34.05, 71.50], Concepts_Covered: ["BISP Intro", "Storytelling", "Know When", "Count & Confirm", "No Deductions", "Budgeting", "Saving", "Investment", "Account Types", "Bank Services", "ATM Demo", "Fraud Types", "Loan Mgmt", "NSER Importance", "Calculator Use", "Saving Number", "Reading SMS"], Trainer_Feedback_Deck_Section: {}, Time_Spent_Per_Section: { "Intro": 22, "Money Mgmt": 35, "Financial Plan": 45, "Banking": 28, "Risks": 30, "Practical": 18 }, Audience_Engagement_Per_Section: { "Intro": 5, "Money Mgmt": 5, "Financial Plan": 5, "Banking": 4, "Risks": 4, "Practical": 4 }, Trainer_Rating: 9.2, Beneficiaries_Trained: 70, Handbooks_Distributed: 65 },
+    { SessionID: "TS009", Trainer: "Ali Raza", Province: "Sindh", Date: "2025-07-17", GPS: [25.00, 67.10], Concepts_Covered: ["BISP Intro", "Storytelling", "Know When", "Count & Confirm", "No Deductions", "Budgeting", "Saving", "Investment", "Account Types", "Bank Services", "ATM Demo", "Fraud Types", "Loan Mgmt", "NSER Importance", "Calculator Use", "Saving Number", "Reading SMS"], Trainer_Feedback_Deck_Section: {}, Time_Spent_Per_Section: { "Intro": 20, "Money Mgmt": 30, "Financial Plan": 40, "Banking": 25, "Risks": 35, "Practical": 15 }, Audience_Engagement_Per_Section: { "Intro": 5, "Money Mgmt": 4, "Financial Plan": 5, "Banking": 4, "Risks": 4, "Practical": 4 }, Trainer_Rating: 8.7, Beneficiaries_Trained: 52, Handbooks_Distributed: 50 },
+    { SessionID: "TS010", Trainer: "Usman Malik", Province: "Balochistan", Date: "2025-07-16", GPS: [30.25, 66.90], Concepts_Covered: ["BISP Intro", "Storytelling", "Know When", "Count & Confirm", "No Deductions", "Budgeting", "Saving", "Investment", "Account Types", "Fraud Types", "Loan Mgmt", "NSER Importance", "Calculator Use", "Saving Number", "Reading SMS"], Trainer_Feedback_Deck_Section: { "Banking": "Audience confused on digital banking, need more examples." }, Time_Spent_Per_Section: { "Intro": 18, "Money Mgmt": 28, "Financial Plan": 35, "Banking": 18, "Risks": 30, "Practical": 15 }, Audience_Engagement_Per_Section: { "Intro": 4, "Money Mgmt": 3, "Financial Plan": 4, "Banking": 2, "Risks": 3, "Practical": 3 }, Trainer_Rating: 7.2, Beneficiaries_Trained: 48, Handbooks_Distributed: 45 },
+    { SessionID: "TS011", Trainer: "Sana Khan", Province: "Punjab", Date: "2025-07-15", GPS: [30.70, 72.30], Concepts_Covered: ["BISP Intro", "Storytelling", "Know When", "Count & Confirm", "No Deductions", "Budgeting", "Saving", "Investment", "Account Types", "Bank Services", "ATM Demo", "Fraud Types", "Loan Mgmt", "NSER Importance", "Calculator Use", "Saving Number", "Reading SMS"], Trainer_Feedback_Deck_Section: {}, Time_Spent_Per_Section: { "Intro": 20, "Money Mgmt": 30, "Financial Plan": 40, "Banking": 25, "Risks": 35, "Practical": 15 }, Audience_Engagement_Per_Section: { "Intro": 5, "Money Mgmt": 4, "Financial Plan": 5, "Banking": 4, "Risks": 4, "Practical": 4 }, Trainer_Rating: 9.1, Beneficiaries_Trained: 75, Handbooks_Distributed: 70 },
+    { SessionID: "TS012", Trainer: "Fatima Ahmed", Province: "Sindh", Date: "2025-07-14", GPS: [24.80, 67.00], Concepts_Covered: ["BISP Intro", "Storytelling", "Know When", "Count & Confirm", "No Deductions", "Budgeting", "Saving", "Investment", "Account Types", "Bank Services", "ATM Demo", "Fraud Types", "Loan Mgmt", "NSER Importance", "Calculator Use", "Saving Number", "Reading SMS"], Trainer_Feedback_Deck_Section: {}, Time_Spent_Per_Section: { "Intro": 22, "Money Mgmt": 35, "Financial Plan": 45, "Banking": 28, "Risks": 30, "Practical": 18 }, Audience_Engagement_Per_Section: { "Intro": 5, "Money Mgmt": 5, "Financial Plan": 5, "Banking": 4, "Risks": 4, "Practical": 4 }, Trainer_Rating: 9.3, Beneficiaries_Trained: 68, Handbooks_Distributed: 62 },
+];
+
+// Mock Trainer Targets (for ranking)
+const mockTrainerTargets = {
+    "Ali Raza": 200,
+    "Sana Khan": 250,
+    "Usman Malik": 180,
+    "Fatima Ahmed": 220
+};
+
+
+let avgMainSectionCoverageGaugeChart, mostCoveredChart, leastCoveredChart, sectionBreakdownChart, programTrendChart;
+let deckMap, trainingLocationMarkers = L.featureGroup(); // Use a featureGroup for easy clearing
+let selectedMainSection = null;
+let selectedTrainerForDetails = null; // Track selected trainer in ranking table
+
+let currentFilters = { 
+    province: 'All', 
+    trainer: 'All', 
+    startDate: null, 
+    endDate: null 
+};
+
+// --- INITIALIZATION ---
+document.addEventListener('DOMContentLoaded', () => {
+    initializeDashboard();
+});
+
+function initializeDashboard() {
+    updateTime(); 
+    setInterval(updateTime, 1000);
+    populateFilters();
+
+    // Set default date filter range to cover all mock data dates
+    const allDates = mockTrainingSessionData.map(d => Luxon.DateTime.fromISO(d.Date));
+    const minDate = Luxon.DateTime.min(...allDates);
+    const maxDate = Luxon.DateTime.max(...allDates);
+
+    currentFilters.startDate = minDate.toISODate();
+    currentFilters.endDate = maxDate.toISODate();
+    document.getElementById('startDateFilter').value = currentFilters.startDate;
+    document.getElementById('endDateFilter').value = currentFilters.endDate;
+    
+    // Initialize Charts
+    // Gauge Chart for Avg Main Section Coverage
+    avgMainSectionCoverageGaugeChart = new Chart('avgMainSectionCoverageGauge', {
+        type: 'radialGauge',
+        data: {
+            labels: ['Coverage'],
+            datasets: [{
+                data: [0], // Initial value
+                backgroundColor: ['#4f46e5'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            circumference: 180,
+            rotation: -90,
+            cutout: '70%',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: false },
+                datalabels: { display: false } // Value displayed manually
+            }
+        }
+    });
+
+    // Horizontal Bar Chart for Most Covered
+    mostCoveredChart = new Chart('mostCoveredChart', { 
+        type: 'bar', 
+        options: getHorizontalBarChartOptions() 
+    });
+
+    // Horizontal Bar Chart for Least Covered
+    leastCoveredChart = new Chart('leastCoveredChart', { 
+        type: 'bar', 
+        options: getHorizontalBarChartOptions() 
+    });
+
+    // Horizontal Bar Chart for Sub-Concept Breakdown
+    sectionBreakdownChart = new Chart('sectionBreakdownChart', { 
+        type: 'bar', 
+        options: getHorizontalBarChartOptions(false, 0) // No labels on bars by default, start x-axis at 0
+    });
+
+    // Program Trend Line Chart
+    programTrendChart = new Chart('programTrendChart', {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Beneficiaries Trained',
+                    data: [],
+                    borderColor: '#22c55e',
+                    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                    fill: true,
+                    tension: 0.3
+                },
+                {
+                    label: 'Handbooks Distributed',
+                    data: [],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    fill: true,
+                    tension: 0.3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: 'day', // Can be 'month', 'day', 'week'
+                        tooltipFormat: 'MMM D, YYYY',
+                        displayFormats: {
+                            day: 'MMM D'
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Count'
+                    }
+                }
+            },
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.raw.y}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Initialize map
+    deckMap = L.map('deckMap', { zoomControl: true, attributionControl: false }).setView([30.37, 69.34], 5);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png').addTo(deckMap);
+    trainingLocationMarkers.addTo(deckMap); // Add the feature group to the map
+
+    // Initial update of the dashboard with all data
+    updateDashboard();
+}
+
+// Reusable options for horizontal bar charts
+function getHorizontalBarChartOptions(showLabelsOnBars = true, xMin = 0) {
+    return { 
+        indexAxis: 'y', 
+        responsive: true, 
+        maintainAspectRatio: false, 
+        scales: { 
+            y: { ticks: { font: { size: 10 } } }, 
+            x: { 
+                min: xMin, 
+                max: 100, 
+                title: { display: true, text: 'Coverage Percentage' } 
+            } 
+        }, 
+        plugins: { 
+            legend: { display: false }, 
+            tooltip: { 
+                callbacks: {
+                    label: function(context) {
+                        return `${context.label}: ${context.raw.toFixed(0)}${context.chart.id === 'trainerRankingChart' ? ' Trained' : '%'}`;
+                    }
+                }
+            },
+            datalabels: { // Show data labels on bars
+                anchor: 'end',
+                align: 'end',
+                formatter: (value) => showLabelsOnBars ? (value.toFixed(0) + '%') : '',
+                color: (context) => context.dataset.backgroundColor[context.dataIndex],
+                font: {
+                    weight: 'bold',
+                    size: 9
+                },
+                offset: 5,
+                rotation: 0,
+                display: showLabelsOnBars ? 'auto' : false
+            }
+        } 
+    };
+}
+
+// --- INTERACTIVITY ---
+function handleFilterChange(key, value) {
+    currentFilters[key] = value;
+    if (key === 'province') {
+        currentFilters.trainer = 'All'; // Reset trainer filter when province changes
+        populateGlobalTrainerFilter(value);
+        document.getElementById('globalTrainerFilter').value = 'All'; // Update the dropdown
+    }
+    updateDashboard();
+}
+
+function clearFilters() {
+    currentFilters = { province: 'All', trainer: 'All', startDate: null, endDate: null };
+    selectedMainSection = null; 
+    selectedTrainerForDetails = null;
+    document.getElementById('provinceFilter').value = 'All';
+    populateGlobalTrainerFilter('All');
+    document.getElementById('globalTrainerFilter').value = 'All';
+    
+    // Reset date filters to cover all mock data
+    const allDates = mockTrainingSessionData.map(d => Luxon.DateTime.fromISO(d.Date));
+    if (allDates.length > 0) {
+        const minDate = Luxon.DateTime.min(...allDates);
+        const maxDate = Luxon.DateTime.max(...allDates);
+        currentFilters.startDate = minDate.toISODate();
+        currentFilters.endDate = maxDate.toISODate();
+    } else {
+        currentFilters.startDate = '';
+        currentFilters.endDate = '';
+    }
+    document.getElementById('startDateFilter').value = currentFilters.startDate;
+    document.getElementById('endDateFilter').value = currentFilters.endDate;
+
+    updateDashboard();
+}
+
+function selectMainSection(sectionName) {
+    selectedMainSection = sectionName;
+    document.querySelectorAll('.deck-section-row').forEach(row => row.classList.remove('selected'));
+    const selectedRow = document.getElementById(`deck-section-${sectionName.replace(/\s/g, '-')}`);
+    if (selectedRow) {
+        selectedRow.classList.add('selected');
+    }
+    renderSectionDetails(sectionName);
+    updateDeckMapMarkers(); // Update map markers based on selected section
+}
+
+function selectTrainerForDetails(trainerName) {
+    selectedTrainerForDetails = trainerName;
+    document.querySelectorAll('.trainer-row').forEach(row => row.classList.remove('selected'));
+    const selectedRow = document.getElementById(`trainer-row-${trainerName.replace(/\s/g, '-')}`);
+    if (selectedRow) {
+        selectedRow.classList.add('selected');
+    }
+    // No direct impact on other cards for trainer selection in this iteration,
+    // but the selectedTrainerForDetails variable is available if you want to
+    // add a "Trainer Details" card later.
+}
+
+
+// --- RENDERING ---
+function updateDashboard() {
+    const { province, trainer, startDate, endDate } = currentFilters;
+    let filteredData = mockTrainingSessionData.filter(item => {
+        const itemDate = Luxon.DateTime.fromISO(item.Date);
+        return (province === 'All' || item.Province === province) &&
+               (trainer === 'All' || item.Trainer === trainer) &&
+               (!startDate || itemDate >= Luxon.DateTime.fromISO(startDate)) &&
+               (!endDate || itemDate <= Luxon.DateTime.fromISO(endDate));
+    });
+
+    renderOverallDeckStats(filteredData);
+    renderTopBottomSections(filteredData);
+    renderProgramOutreach(filteredData); // NEW
+    renderSectionMatrix(filteredData);
+    renderTrainerRanking(filteredData); // NEW
+    updateDeckMapMarkers(filteredData); // Renamed from updateDeckMapHeatmap
+
+    // Automatically select the first main section or re-render if already selected
+    if (ALL_MAIN_SECTIONS.length > 0 && filteredData.length > 0) {
+        if (!selectedMainSection || !ALL_MAIN_SECTIONS.includes(selectedMainSection)) {
+            selectedMainSection = ALL_MAIN_SECTIONS[0];
+        }
+        renderSectionDetails(selectedMainSection);
+    } else {
+        selectedMainSection = null;
+        renderSectionDetails(null); // Clear section details if no data or no sections
+    }
+    if (selectedMainSection) {
+        document.getElementById(`deck-section-${selectedMainSection.replace(/\s/g, '-')}`)?.classList.add('selected');
+    }
+
+    // Set a default selected trainer in ranking table if available
+    const uniqueTrainers = [...new Set(filteredData.map(d => d.Trainer))].sort();
+    if (uniqueTrainers.length > 0) {
+        if (!selectedTrainerForDetails || !uniqueTrainers.includes(selectedTrainerForDetails)) {
+            selectedTrainerForDetails = uniqueTrainers[0];
+        }
+        selectTrainerForDetails(selectedTrainerForDetails);
+    } else {
+        selectedTrainerForDetails = null;
+    }
+}
+
+function renderOverallDeckStats(data) {
+    const totalSessions = data.length;
+    let totalMainSectionsCoveredCount = 0;
+    let totalSubConceptsCoveredCount = 0;
+    const totalPossibleMainSections = ALL_MAIN_SECTIONS.length * totalSessions;
+    const totalPossibleSubConcepts = ALL_SUB_CONCEPTS.length * totalSessions;
+
+    if (totalSessions > 0) {
+        data.forEach(session => {
+            ALL_MAIN_SECTIONS.forEach(mainSection => {
+                const subConceptsInThisSection = SYLLABUS[mainSection];
+                const coveredSubConcepts = subConceptsInThisSection.filter(sc => session.Concepts_Covered.includes(sc)).length;
+                if (coveredSubConcepts === subConceptsInThisSection.length) {
+                    totalMainSectionsCoveredCount++;
+                }
+                totalSubConceptsCoveredCount += coveredSubConcepts;
+            });
+        });
+    }
+
+    const avgMainSectionCoverage = totalPossibleMainSections > 0 ? (totalMainSectionsCoveredCount / totalPossibleMainSections * 100) : 0;
+    const avgSubConceptCoverage = totalPossibleSubConcepts > 0 ? (totalSubConceptsCoveredCount / totalPossibleSubConcepts * 100) : 0;
+
+    document.getElementById('totalDeckSections').textContent = ALL_MAIN_SECTIONS.length;
+    document.getElementById('totalSessionsTracked').textContent = totalSessions;
+    document.getElementById('avgSubConceptCoverage').textContent = `${avgSubConceptCoverage.toFixed(1)}%`;
+    
+    // Update Gauge Chart
+    avgMainSectionCoverageGaugeChart.data.datasets[0].data = [avgMainSectionCoverage];
+    avgMainSectionCoverageGaugeChart.update();
+    document.getElementById('avgMainSectionCoverageValue').textContent = `${avgMainSectionCoverage.toFixed(0)}%`;
+}
+
+function renderTopBottomSections(data) {
+    const sectionCoverageData = ALL_MAIN_SECTIONS.map(mainSection => {
+        const subConceptsInThisSection = SYLLABUS[mainSection];
+        let sessionsFullyCovered = 0;
+
+        data.forEach(session => {
+            const coveredSubConceptsCount = subConceptsInThisSection.filter(sc => session.Concepts_Covered.includes(sc)).length;
+            if (coveredSubConceptsCount === subConceptsInThisSection.length) {
+                sessionsFullyCovered++;
+            }
+        });
+        
+        const overallCoveragePercent = data.length > 0 ? (sessionsFullyCovered / data.length * 100) : 0;
+        return { name: mainSection, overallCoverage: overallCoveragePercent };
+    });
+
+    const sortedByOverallCoverage = [...sectionCoverageData].sort((a, b) => b.overallCoverage - a.overallCoverage);
+    const mostCovered = sortedByOverallCoverage.slice(0, 5).reverse(); // Top 5
+    const leastCovered = sortedByOverallCoverage.slice(-5); // Bottom 5
+
+    // Update Most Covered Chart
+    mostCoveredChart.data = {
+        labels: mostCovered.map(s => s.name),
+        datasets: [{
+            data: mostCovered.map(s => s.overallCoverage),
+            backgroundColor: mostCovered.map(s => s.overallCoverage === 100 ? '#22c55e' : (s.overallCoverage > 50 ? '#fbbf24' : '#ef4444'))
+        }]
+    };
+    mostCoveredChart.options.plugins.datalabels.color = (context) => context.dataset.backgroundColor[context.dataIndex];
+    mostCoveredChart.update();
+
+    // Update Least Covered Chart
+    leastCoveredChart.data = {
+        labels: leastCovered.map(s => s.name),
+        datasets: [{
+            data: leastCovered.map(s => s.overallCoverage),
+            backgroundColor: leastCovered.map(s => s.overallCoverage === 100 ? '#22c55e' : (s.overallCoverage > 50 ? '#fbbf24' : '#ef4444'))
+        }]
+    };
+    leastCoveredChart.options.plugins.datalabels.color = (context) => context.dataset.backgroundColor[context.dataIndex];
+    leastCoveredChart.update();
+}
+
+function renderProgramOutreach(data) {
+    const totalBeneficiaries = data.reduce((sum, session) => sum + (session.Beneficiaries_Trained || 0), 0);
+    const totalHandbooks = data.reduce((sum, session) => sum + (session.Handbooks_Distributed || 0), 0);
+
+    document.getElementById('totalBeneficiariesTrained').textContent = totalBeneficiaries.toLocaleString();
+    document.getElementById('totalHandbooksDistributed').textContent = totalHandbooks.toLocaleString();
+
+    // Prepare data for trend chart
+    const dailyData = {}; // { 'YYYY-MM-DD': { beneficiaries: N, handbooks: M } }
+    data.forEach(session => {
+        const date = Luxon.DateTime.fromISO(session.Date).toISODate(); // Use Luxon for consistent date formatting
+        if (!dailyData[date]) {
+            dailyData[date] = { beneficiaries: 0, handbooks: 0 };
+        }
+        dailyData[date].beneficiaries += (session.Beneficiaries_Trained || 0);
+        dailyData[date].handbooks += (session.Handbooks_Distributed || 0);
+    });
+
+    const sortedDates = Object.keys(dailyData).sort();
+    const beneficiariesTrendData = sortedDates.map(date => ({ x: date, y: dailyData[date].beneficiaries }));
+    const handbooksTrendData = sortedDates.map(date => ({ x: date, y: dailyData[date].handbooks }));
+
+    programTrendChart.data.labels = sortedDates;
+    programTrendChart.data.datasets[0].data = beneficiariesTrendData;
+    programTrendChart.data.datasets[1].data = handbooksTrendData;
+    programTrendChart.update();
+}
+
+function renderSectionMatrix(data) {
+    const matrixDiv = document.getElementById('sectionMatrix');
+    let tableHTML = '<table><thead><tr><th class="!text-left w-1/4">Main Deck Section</th><th>Overall Coverage (%)</th><th>Avg. Sub-Concept Coverage (%)</th><th>Trainers Covering 100%</th><th>Avg. Time Spent (min)</th><th>Avg. Engagement (1-5)</th></tr></thead><tbody>';
+
+    ALL_MAIN_SECTIONS.forEach(mainSection => {
+        const subConceptsInThisSection = SYLLABUS[mainSection];
+        let totalSessionsForSection = 0;
+        let sessionsFullyCoveredCount = 0;
+        let totalSubConceptsCoveredForSection = 0;
+        let totalTimeSpent = 0;
+        let totalEngagementScore = 0;
+        let sessionsWithEngagement = 0;
+        const trainersWhoFullyCovered = new Set();
+
+        data.forEach(session => {
+            totalSessionsForSection++;
+            const coveredSubConcepts = subConceptsInThisSection.filter(sc => session.Concepts_Covered.includes(sc)).length;
+            totalSubConceptsCoveredForSection += coveredSubConcepts;
+
+            if (coveredSubConcepts === subConceptsInThisSection.length) {
+                sessionsFullyCoveredCount++;
+                trainersWhoFullyCovered.add(session.Trainer);
+            }
+            
+            if (session.Time_Spent_Per_Section && session.Time_Spent_Per_Section[mainSection] !== undefined) {
+                totalTimeSpent += session.Time_Spent_Per_Section[mainSection];
+            }
+            if (session.Audience_Engagement_Per_Section && session.Audience_Engagement_Per_Section[mainSection] !== undefined) {
+                totalEngagementScore += session.Audience_Engagement_Per_Section[mainSection];
+                sessionsWithEngagement++;
+            }
+        });
+
+        const overallSectionCoverage = totalSessionsForSection > 0 ? (sessionsFullyCoveredCount / totalSessionsForSection * 100) : 0;
+        const avgSubConceptCoverage = totalSessionsForSection > 0 && subConceptsInThisSection.length > 0
+            ? (totalSubConceptsCoveredForSection / (subConceptsInThisSection.length * totalSessionsForSection) * 100) : 0;
+        const avgTimeSpent = totalSessionsForSection > 0 ? (totalTimeSpent / totalSessionsForSection) : 0;
+        const avgEngagement = sessionsWithEngagement > 0 ? (totalEngagementScore / sessionsWithEngagement) : 0;
+
+        tableHTML += `<tr class="deck-section-row" id="deck-section-${mainSection.replace(/\s/g, '-')}" onclick="selectMainSection('${mainSection}')">
+            <td class="!text-left">${mainSection}</td>
+            <td>
+                <div class="coverage-bar-full">
+                    <div class="bar-container"><div class="bar-fill" style="width: ${overallSectionCoverage.toFixed(0)}%; background-color: ${overallSectionCoverage === 100 ? '#22c55e' : (overallSectionCoverage > 50 ? '#fbbf24' : '#ef4444')};"></div></div>
+                    <span class="font-bold w-10 text-right">${overallSectionCoverage.toFixed(0)}%</span>
+                </div>
+            </td>
+            <td>
+                <div class="coverage-bar-full">
+                    <div class="bar-container"><div class="bar-fill" style="width: ${avgSubConceptCoverage.toFixed(0)}%; background-color: ${avgSubConceptCoverage === 100 ? '#22c55e' : (avgSubConceptCoverage > 50 ? '#fbbf24' : '#ef4444')};"></div></div>
+                    <span class="font-bold w-10 text-right">${avgSubConceptCoverage.toFixed(0)}%</span>
+                </div>
+            </td>
+            <td>${trainersWhoFullyCovered.size} / ${new Set(data.map(d => d.Trainer)).size}</td>
+            <td>${avgTimeSpent.toFixed(1)}</td>
+            <td>${avgEngagement.toFixed(1)}</td>
+        </tr>`;
+    });
+    tableHTML += '</tbody></table>';
+    matrixDiv.innerHTML = tableHTML;
+}
+
+function renderSectionDetails(mainSectionName) {
+    const subConceptBreakdownTitle = document.getElementById('subConceptBreakdownTitle');
+    const sectionDetailsTitle = document.getElementById('sectionDetailsTitle');
+    const sectionFeedbackNotes = document.getElementById('sectionFeedbackNotes');
+    const sectionMissedSessions = document.getElementById('sectionMissedSessions');
+
+    if (!mainSectionName) {
+        subConceptBreakdownTitle.textContent = 'Sub-Concept Coverage';
+        sectionBreakdownChart.data = { labels: [], datasets: [] };
+        sectionBreakdownChart.update();
+        sectionDetailsTitle.textContent = 'Details for Selected Section';
+        sectionFeedbackNotes.innerHTML = `<p class="text-center text-gray-500 p-2">Select a deck section from the table to see details.</p>`;
+        sectionMissedSessions.innerHTML = `<p class="text-center text-gray-500 p-2">Select a deck section from the table to see incomplete sessions.</p>`;
+        return;
+    }
+
+    subConceptBreakdownTitle.textContent = `Sub-Concept Coverage for '${mainSectionName}'`;
+    sectionDetailsTitle.textContent = `Details for '${mainSectionName}' Section`;
+
+    const subConcepts = SYLLABUS[mainSectionName];
+    const filteredData = mockTrainingSessionData.filter(item => {
+        const itemDate = Luxon.DateTime.fromISO(item.Date);
+        return (currentFilters.province === 'All' || item.Province === currentFilters.province) &&
+               (currentFilters.trainer === 'All' || item.Trainer === currentFilters.trainer) &&
+               (!currentFilters.startDate || itemDate >= Luxon.DateTime.fromISO(currentFilters.startDate)) &&
+               (!currentFilters.endDate || itemDate <= Luxon.DateTime.fromISO(currentFilters.endDate));
+    });
+
+    const subConceptCoverage = subConcepts.map(subConcept => {
+        let coveredCount = 0;
+        filteredData.forEach(session => {
+            if (session.Concepts_Covered.includes(subConcept)) {
+                coveredCount++;
+            }
+        });
+        return {
+            name: subConcept,
+            value: filteredData.length > 0 ? (coveredCount / filteredData.length * 100) : 0
+        };
+    }).sort((a, b) => a.value - b.value); // Sort so lower coverage is at the top
+
+    sectionBreakdownChart.data = {
+        labels: subConceptCoverage.map(d => d.name),
+        datasets: [{
+            label: 'Coverage',
+            data: subConceptCoverage.map(d => d.value),
+            backgroundColor: subConceptCoverage.map(d => d.value === 100 ? '#22c55e' : (d.value > 0 ? '#fbbf24' : '#ef4444'))
+        }]
+    };
+    sectionBreakdownChart.options.plugins.datalabels.display = true; // Make sure labels are shown
+    sectionBreakdownChart.options.plugins.datalabels.formatter = (value) => value.toFixed(0) + '%';
+    sectionBreakdownChart.options.plugins.datalabels.color = (context) => context.dataset.backgroundColor[context.dataIndex];
+    sectionBreakdownChart.update();
+
+    // Aggregating Trainer Feedback/Notes for this section
+    let feedbackHtml = '';
+    const sectionFeedbacks = {}; // { SessionID: [feedback]}
+    const missedSessionsList = [];
+
+    filteredData.forEach(session => {
+        const subConceptsInThisSection = SYLLABUS[mainSectionName];
+        const coveredSubConceptsCount = subConceptsInThisSection.filter(sc => session.Concepts_Covered.includes(sc)).length;
+        if (coveredSubConceptsCount < subConceptsInThisSection.length) {
+            missedSessionsList.push({
+                SessionID: session.SessionID,
+                Trainer: session.Trainer,
+                Date: session.Date,
+                ConceptsMissed: subConceptsInThisSection.filter(sc => !session.Concepts_Covered.includes(sc))
+            });
+        }
+
+        if (session.Trainer_Feedback_Deck_Section && session.Trainer_Feedback_Deck_Section[mainSectionName]) {
+            if (!sectionFeedbacks[session.SessionID]) {
+                sectionFeedbacks[session.SessionID] = [];
+            }
+            sectionFeedbacks[session.SessionID].push(session.Trainer_Feedback_Deck_Section[mainSectionName]);
+        }
+    });
+
+    if (Object.keys(sectionFeedbacks).length > 0) {
+        feedbackHtml = `<p class="font-semibold text-blue-700 mb-1">Trainer Feedback on this section:</p><ul class="list-disc list-inside text-blue-600 text-xs">`;
+        for (const sessionId in sectionFeedbacks) {
+            const sessionTrainer = filteredData.find(s => s.SessionID === sessionId)?.Trainer;
+            feedbackHtml += `<li><strong>Session ${sessionId} (${sessionTrainer}):</strong> ${sectionFeedbacks[sessionId].join('; ')}</li>`;
+        }
+        feedbackHtml += `</ul>`;
+    } else {
+        feedbackHtml = `<p class="text-gray-600 text-xs">No specific trainer feedback recorded for this section in filtered sessions.</p>`;
+    }
+    sectionFeedbackNotes.innerHTML = feedbackHtml;
+
+    let missedSessionsHtml = '';
+    if (missedSessionsList.length > 0) {
+        missedSessionsHtml = `<p class="font-semibold text-red-700 mb-1">Sessions where this section was incomplete or skipped:</p><ul class="list-disc list-inside text-red-600 text-xs">`;
+        missedSessionsList.forEach(s => {
+            missedSessionsHtml += `<li><strong>${s.SessionID}</strong> by ${s.Trainer} on ${s.Date} (Missed: ${s.ConceptsMissed.join(', ')})</li>`;
+        });
+        missedSessionsHtml += `</ul>`;
+    } else {
+        missedSessionsHtml = `<p class="font-semibold text-green-700 text-xs">This section was fully covered in all filtered sessions!</p>`;
+    }
+    sectionMissedSessions.innerHTML = missedSessionsHtml;
+}
+
+function renderTrainerRanking(data) {
+    const trainerRankingDiv = document.getElementById('trainerRankingTable');
+    let trainerPerformance = {}; // { TrainerName: { trained: N, target: M, sessions: [] } }
+
+    // Aggregate data per trainer
+    data.forEach(session => {
+        if (!trainerPerformance[session.Trainer]) {
+            trainerPerformance[session.Trainer] = {
+                trained: 0,
+                target: mockTrainerTargets[session.Trainer] || 0, // Get target from mock data
+                sessionsCount: 0,
+                totalEngagement: 0,
+                totalRating: 0,
+                sessions: []
+            };
+        }
+        trainerPerformance[session.Trainer].trained += (session.Beneficiaries_Trained || 0);
+        trainerPerformance[session.Trainer].sessionsCount++;
+        // Calculate average engagement for the session, then add to trainer's total
+        const sessionEngagementValues = Object.values(session.Audience_Engagement_Per_Section || {});
+        const avgSessionEngagement = sessionEngagementValues.length > 0 ? (sessionEngagementValues.reduce((sum, val) => sum + val, 0) / sessionEngagementValues.length) : 0;
+        trainerPerformance[session.Trainer].totalEngagement += avgSessionEngagement;
+        
+        trainerPerformance[session.Trainer].totalRating += (session.Trainer_Rating || 0);
+        trainerPerformance[session.Trainer].sessions.push(session); // Store session for details if needed
+    });
+
+    // Calculate achievement percentage and average metrics
+    const rankedTrainers = Object.keys(trainerPerformance).map(trainerName => {
+        const perf = trainerPerformance[trainerName];
+        const achievement = perf.target > 0 ? (perf.trained / perf.target * 100) : 0;
+        const avgEngagement = perf.sessionsCount > 0 ? (perf.totalEngagement / perf.sessionsCount) : 0;
+        const avgRating = perf.sessionsCount > 0 ? (perf.totalRating / perf.sessionsCount) : 0;
+        return {
+            name: trainerName,
+            trained: perf.trained,
+            target: perf.target,
+            achievement: achievement,
+            avgEngagement: avgEngagement,
+            avgRating: avgRating,
+            sessions: perf.sessions
+        };
+    }).sort((a, b) => b.achievement - a.achievement); // Rank by achievement descending
+
+    let tableHTML = '<table><thead><tr><th class="!text-left w-1/4">Trainer</th><th>Beneficiaries Trained</th><th>Target Achievement (%)</th><th>Avg. Session Engagement (1-5)</th><th>Avg. Trainer Rating (1-10)</th></tr></thead><tbody>';
+
+    if (rankedTrainers.length === 0) {
+        tableHTML += '<tr><td colspan="5" class="text-center text-gray-500 py-4">No trainer data available for current filters.</td></tr>';
+    } else {
+        rankedTrainers.forEach(trainer => {
+            const achievementColor = trainer.achievement >= 100 ? '#22c55e' : (trainer.achievement >= 70 ? '#fbbf24' : '#ef4444');
+            tableHTML += `<tr class="trainer-row" id="trainer-row-${trainer.name.replace(/\s/g, '-')}" onclick="selectTrainerForDetails('${trainer.name}')">
+                <td class="!text-left font-semibold">${trainer.name}</td>
+                <td>${trainer.trained.toLocaleString()}</td>
+                <td>
+                    <div class="coverage-bar-full">
+                        <div class="bar-container"><div class="bar-fill" style="width: ${Math.min(trainer.achievement, 100).toFixed(0)}%; background-color: ${achievementColor};"></div></div>
+                        <span class="font-bold w-10 text-right">${trainer.achievement.toFixed(1)}%</span>
+                    </div>
+                </td>
+                <td>${trainer.avgEngagement.toFixed(1)}</td>
+                <td>${trainer.avgRating.toFixed(1)}</td>
+            </tr>`;
+        });
+    }
+    tableHTML += '</tbody></table>';
+    trainerRankingDiv.innerHTML = tableHTML;
+}
+
+function updateDeckMapMarkers(data = null) {
+    const dataToUse = data || mockTrainingSessionData.filter(item => {
+        const itemDate = Luxon.DateTime.fromISO(item.Date);
+        return (currentFilters.province === 'All' || item.Province === currentFilters.province) &&
+               (currentFilters.trainer === 'All' || item.Trainer === currentFilters.trainer) &&
+               (!currentFilters.startDate || itemDate >= Luxon.DateTime.fromISO(currentFilters.startDate)) &&
+               (!currentFilters.endDate || itemDate <= Luxon.DateTime.fromISO(currentFilters.endDate));
+    });
+
+    trainingLocationMarkers.clearLayers(); // Clear all existing markers
+
+    dataToUse.forEach(session => {
+        if (!session.GPS || session.GPS.length !== 2) return; // Skip if GPS data is missing or malformed
+
+        let avgEngagementForSession = 0;
+        const engagementValues = Object.values(session.Audience_Engagement_Per_Section || {});
+        if (engagementValues.length > 0) {
+            avgEngagementForSession = engagementValues.reduce((sum, val) => sum + val, 0) / engagementValues.length;
+        }
+
+        let markerColorClass = '';
+        if (avgEngagementForSession >= 4) {
+            markerColorClass = 'engagement-high';
+        } else if (avgEngagementForSession >= 2.5) {
+            markerColorClass = 'engagement-medium';
+        } else {
+            markerColorClass = 'engagement-low';
+        }
+
+        const customIcon = L.divIcon({
+            className: `leaflet-marker-icon ${markerColorClass}`,
+            html: '', // Empty HTML for a simple colored dot
+            iconSize: [15, 15]
+        });
+
+        const popupContent = `
+            <b>Session ID:</b> ${session.SessionID}<br>
+            <b>Trainer:</b> ${session.Trainer}<br>
+            <b>Date:</b> ${session.Date}<br>
+            <b>Province:</b> ${session.Province}<br>
+            <b>Beneficiaries:</b> ${session.Beneficiaries_Trained}<br>
+            <b>Avg. Engagement:</b> ${avgEngagementForSession.toFixed(1)}/5
+        `;
+
+        L.marker(session.GPS, { icon: customIcon })
+            .bindPopup(popupContent)
+            .addTo(trainingLocationMarkers);
+    });
+
+    if (dataToUse.length > 0) {
+        const latLngs = dataToUse.map(d => L.latLng(d.GPS[0], d.GPS[1]));
+        deckMap.fitBounds(L.latLngBounds(latLngs), { padding: [20, 20] });
+    } else {
+        deckMap.setView([30.37, 69.34], 5); // Default view if no data
+    }
+}
+
+
+// --- GENERIC HELPERS ---
+function populateFilters() {
+    const provFilter = document.getElementById('provinceFilter');
+    provFilter.innerHTML = ['All', ...new Set(mockTrainingSessionData.map(d => d.Province))].sort().map(val => `<option value="${val}">${val}</option>`).join('');
+    populateGlobalTrainerFilter('All');
+}
+
+function populateGlobalTrainerFilter(province) {
+    const trainerFilter = document.getElementById('globalTrainerFilter');
+    const trainers = province === 'All' 
+        ? [...new Set(mockTrainingSessionData.map(d => d.Trainer))] 
+        : [...new Set(mockTrainingSessionData.filter(d => d.Province === province).map(d => d.Trainer))];
+    trainerFilter.innerHTML = ['All', ...trainers.sort()].map(val => `<option value="${val}">${val}</option>`).join('');
+}
+
+function updateTime() {
+    const now = Luxon.DateTime.now().setZone('Asia/Karachi'); // Set timezone to PKT
+    document.getElementById('currentTime').textContent = now.toFormat('hh:mm a');
+    document.getElementById('currentDate').textContent = now.toFormat('MMMM d, yyyy');
+}
+</script>
+</body>
+</html>
